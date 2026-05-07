@@ -1,0 +1,11 @@
+{
+  "id": "com.bingbaihanji.sunsen.demo.plain.hello",
+  "name": "Hello Plugin",
+  "version": "1.0.0",
+  "apiVersion": "1.0",
+  "mainClass": "com.bingbaihanji.sunsen.demo.plain.hello.HelloPlugin",
+  "packagePrefixes": [
+    "com.bingbaihanji.sunsen.demo.plain.hello"
+  ],
+  "dependencies": []
+}

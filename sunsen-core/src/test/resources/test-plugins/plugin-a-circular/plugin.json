@@ -1,0 +1,17 @@
+{
+  "id": "com.bingbaihanji.sunsen.core.test.circular.a",
+  "name": "A Plugin",
+  "version": "1.0.0",
+  "apiVersion": "1.0",
+  "mainClass": "com.bingbaihanji.sunsen.core.test.circular.a.APlugin",
+  "packagePrefixes": [
+    "com.bingbaihanji.sunsen.core.test.circular.a"
+  ],
+  "dependencies": [
+    {
+      "id": "com.bingbaihanji.sunsen.core.test.circular.b",
+      "version": ">=1.0.0",
+      "optional": false
+    }
+  ]
+}

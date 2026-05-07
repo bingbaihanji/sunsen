@@ -1,0 +1,17 @@
+{
+  "id": "com.bingbaihanji.sunsen.core.test.world",
+  "name": "World Plugin",
+  "version": "1.0.0",
+  "apiVersion": "1.0",
+  "mainClass": "com.bingbaihanji.sunsen.core.test.world.WorldPlugin",
+  "packagePrefixes": [
+    "com.bingbaihanji.sunsen.core.test.world"
+  ],
+  "dependencies": [
+    {
+      "id": "com.bingbaihanji.sunsen.core.test.hello",
+      "version": ">=1.0.0",
+      "optional": false
+    }
+  ]
+}
