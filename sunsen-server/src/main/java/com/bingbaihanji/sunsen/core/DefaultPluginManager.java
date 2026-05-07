@@ -450,6 +450,7 @@ public class DefaultPluginManager implements PluginManager {
                 new URL[]{jarUrl}, parentClassLoader, descriptor.packagePrefixes(), depLoaders
         );
 
+        DefaultPluginContext[] contextHolder = new DefaultPluginContext[1];
         try {
             stateMachine.transition(pluginId, PluginState.CREATED, PluginState.RESOLVED);
 
@@ -472,6 +473,7 @@ public class DefaultPluginManager implements PluginManager {
             DefaultPluginContext context = new DefaultPluginContext(
                     descriptor, extensionRegistry, eventBus, this, workDir
             );
+            contextHolder[0] = context;
 
             stateMachine.executePhase(() -> pluginInstance.onInit(context), descriptor, PluginState.RESOLVED);
 
@@ -481,6 +483,9 @@ public class DefaultPluginManager implements PluginManager {
             plugins.put(pluginId, new PluginEntry(descriptor, pluginInstance, classLoader, context, jarPath));
             stateMachine.transition(pluginId, PluginState.RESOLVED, PluginState.LOADED);
         } catch (Exception e) {
+            if (contextHolder[0] != null) {
+                contextHolder[0].unsubscribeAll();
+            }
             try {
                 classLoader.close();
             } catch (IOException ignored) {
@@ -565,7 +570,6 @@ public class DefaultPluginManager implements PluginManager {
             if (currentState != null && currentState != PluginState.UNLOADED) {
                 stateMachine.transition(pluginId, currentState, PluginState.UNLOADED);
             }
-            stateMachine.remove(pluginId);
         });
 
         // 3. cancel event subscriptions
