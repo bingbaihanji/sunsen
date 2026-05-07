@@ -8,21 +8,31 @@
 
 ### Maven
 
-Sunsen 采用多模块结构,宿主应用只需引入 `sunsen-core`:
+Sunsen 采用多模块结构:
+
+**宿主应用**引入 `sunsen-server`(连带 `sunsen-core`):
 
 ```xml
 <dependency>
     <groupId>com.bingbaihanji</groupId>
-    <artifactId>sunsen-core</artifactId>
+    <artifactId>sunsen-server</artifactId>
     <version>1.0-SNAPSHOT</version>
 </dependency>
 ```
 
-`mvn install` 后将自动拉取其唯一的编译依赖 `sunsen-api`
+**插件开发者**引入 `sunsen-api`(连带 `sunsen-core`):
+
+```xml
+<dependency>
+    <groupId>com.bingbaihanji</groupId>
+    <artifactId>sunsen-api</artifactId>
+    <version>1.0-SNAPSHOT</version>
+</dependency>
+```
 
 ### 最低环境要求
 
-- **JDK 21+**(框架本身零第三方依赖,仅 `sunsen-core` 依赖 `jackson-databind` 解析 `plugin.json`)
+- **JDK 21+**(`sunsen-core` 零第三方依赖,仅 `sunsen-server` 依赖 `jackson-databind` 解析 `plugin.json`)
 
 ---
 
@@ -45,7 +55,7 @@ public interface Greeter {
 
 **关键规则**:
 
-- 扩展点接口必须位于**宿主 classpath**(或 sunsen-api 模块),确保所有插件通过父 ClassLoader 共享同一类型
+- 扩展点接口必须位于**宿主 classpath**(或 sunsen-core 模块),确保所有插件通过父 ClassLoader 共享同一类型
 - `id` 为空时,框架自动使用接口全限定名作为 key
 - `allowMultiple = false` 时,框架会校验所有插件中该扩展点的实现数量恰好为 1,否则拒绝加载
 
@@ -418,9 +428,11 @@ public class SunsenConfig {
 
 ```
 sunsen/
-├── sunsen-api/                ← 零依赖公共契约
+├── sunsen-core/               ← 零依赖公共契约
 │   └── src/main/java/...
-├── sunsen-core/               ← 标准实现
+├── sunsen-api/                ← 插件开发模块
+│   └── src/main/java/...
+├── sunsen-server/             ← 标准实现
 │   ├── src/main/java/...
 │   └── src/test/...           ← 集成测试 + 测试插件
 ├── sunsen-demo-plain/         ← 纯 Java 演示
@@ -433,7 +445,7 @@ sunsen/
 ### 运行测试
 
 ```bash
-mvn test -pl sunsen-core
+mvn test -pl sunsen-server
 ```
 
 ### 运行 Demo

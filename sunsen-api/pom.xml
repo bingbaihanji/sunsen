@@ -10,6 +10,7 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
+    <!--插件开发模块 开发插件引入此模块-->
     <artifactId>sunsen-api</artifactId>
     <packaging>jar</packaging>
 
@@ -20,7 +21,10 @@
     </properties>
 
     <dependencies>
-        <!-- 零第三方依赖,仅依赖 JDK -->
+        <dependency>
+            <groupId>com.bingbaihanji</groupId>
+            <artifactId>sunsen-core</artifactId>
+        </dependency>
     </dependencies>
 
 </project>

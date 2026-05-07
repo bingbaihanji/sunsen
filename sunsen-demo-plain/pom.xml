@@ -22,7 +22,13 @@
     <dependencies>
         <dependency>
             <groupId>com.bingbaihanji</groupId>
-            <artifactId>sunsen-core</artifactId>
+            <artifactId>sunsen-server</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- 宿主自身不需要 sunsen-api,但插件源码编译时需要其 .class -->
+        <dependency>
+            <groupId>com.bingbaihanji</groupId>
+            <artifactId>sunsen-api</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>
@@ -47,14 +53,16 @@
                         </goals>
                         <configuration>
                             <target>
+                                <property name="core.classes" value="${project.basedir}/../sunsen-core/target/classes"/>
                                 <property name="api.classes" value="${project.basedir}/../sunsen-api/target/classes"/>
                                 <property name="demo.classes" value="${project.build.outputDirectory}"/>
+                                <property name="plugin.cp" value="${demo.classes};${core.classes};${api.classes}"/>
                                 <mkdir dir="${project.build.directory}/plugins"/>
                                 <!-- 编译 Hello 插件 -->
                                 <mkdir dir="${project.build.directory}/plugin-classes/hello"/>
                                 <javac srcdir="src/main/plugin-src/hello"
                                        destdir="${project.build.directory}/plugin-classes/hello"
-                                       classpath="${demo.classes};${api.classes}"
+                                       classpath="${plugin.cp}"
                                        includeantruntime="false"/>
                                 <jar destfile="${project.build.directory}/plugins/plugin-hello.jar"
                                      basedir="${project.build.directory}/plugin-classes/hello">
@@ -62,15 +70,32 @@
                                         <include name="plugin.json"/>
                                     </metainf>
                                 </jar>
+                                <!-- 把 hello 插件的 config.properties 部署到工作目录(框架读取位置) -->
+                                <mkdir dir="${project.build.directory}/plugins/com.bingbaihanji.sunsen.demo.plain.hello"/>
+                                <copy file="src/main/plugin-src/hello/config.properties"
+                                      todir="${project.build.directory}/plugins/com.bingbaihanji.sunsen.demo.plain.hello"
+                                      failonerror="false"/>
                                 <!-- 编译 World 插件 -->
                                 <mkdir dir="${project.build.directory}/plugin-classes/world"/>
                                 <javac srcdir="src/main/plugin-src/world"
                                        destdir="${project.build.directory}/plugin-classes/world"
-                                       classpath="${demo.classes};${api.classes};${project.build.directory}/plugins/plugin-hello.jar"
+                                       classpath="${plugin.cp};${project.build.directory}/plugins/plugin-hello.jar"
                                        includeantruntime="false"/>
                                 <jar destfile="${project.build.directory}/plugins/plugin-world.jar"
                                      basedir="${project.build.directory}/plugin-classes/world">
                                     <metainf dir="src/main/plugin-src/world">
+                                        <include name="plugin.json"/>
+                                    </metainf>
+                                </jar>
+                                <!-- 编译 Scheduler 插件 -->
+                                <mkdir dir="${project.build.directory}/plugin-classes/scheduler"/>
+                                <javac srcdir="src/main/plugin-src/scheduler"
+                                       destdir="${project.build.directory}/plugin-classes/scheduler"
+                                       classpath="${plugin.cp}"
+                                       includeantruntime="false"/>
+                                <jar destfile="${project.build.directory}/plugins/plugin-scheduler.jar"
+                                     basedir="${project.build.directory}/plugin-classes/scheduler">
+                                    <metainf dir="src/main/plugin-src/scheduler">
                                         <include name="plugin.json"/>
                                     </metainf>
                                 </jar>

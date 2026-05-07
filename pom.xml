@@ -10,8 +10,9 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>sunsen-api</module>
         <module>sunsen-core</module>
+        <module>sunsen-api</module>
+        <module>sunsen-server</module>
         <module>sunsen-demo-plain</module>
     </modules>
 
@@ -26,7 +27,17 @@
         <dependencies>
             <dependency>
                 <groupId>com.bingbaihanji</groupId>
+                <artifactId>sunsen-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.bingbaihanji</groupId>
                 <artifactId>sunsen-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.bingbaihanji</groupId>
+                <artifactId>sunsen-server</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -1,0 +1,14 @@
+{
+  "id": "com.bingbaihanji.sunsen.demo.plain.scheduler",
+  "name": "Scheduler Plugin",
+  "version": "1.0.0",
+  "apiVersion": "1.0",
+  "mainClass": "com.bingbaihanji.sunsen.demo.plain.scheduler.SchedulerPlugin",
+  "packagePrefixes": [
+    "com.bingbaihanji.sunsen.demo.plain.scheduler"
+  ],
+  "dependencies": [],
+  "permissions": [
+    "event:publish"
+  ]
+}
