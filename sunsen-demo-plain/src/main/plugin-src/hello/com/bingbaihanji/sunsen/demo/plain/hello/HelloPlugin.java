@@ -1,6 +1,7 @@
 package com.bingbaihanji.sunsen.demo.plain.hello;
 
 import com.bingbaihanji.sunsen.api.annotation.Extension;
+import com.bingbaihanji.sunsen.api.annotation.Plugin;
 import com.bingbaihanji.sunsen.api.support.AbstractPlugin;
 import com.bingbaihanji.sunsen.api.support.PluginProperties;
 import com.bingbaihanji.sunsen.demo.plain.Greeter;
@@ -19,6 +20,13 @@ import java.util.List;
  *   <li>{@code onStart()} 中订阅 {@link GreetingEvent}，框架在 UNLOADED 时自动取消订阅</li>
  * </ul>
  */
+@Plugin(
+        id = "com.bingbaihanji.sunsen.demo.plain.hello",
+        name = "Hello Plugin",
+        version = "1.0.0",
+        packagePrefixes = "com.bingbaihanji.sunsen.demo.plain.hello",
+        permissions = "event:subscribe"
+)
 public class HelloPlugin extends AbstractPlugin {
 
     /** 问候语后缀，从 config.properties 读取。 */

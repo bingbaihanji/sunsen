@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
+ * 所有插件入口必须继承此抽象类
  * 插件抽象基类,对 {@link Plugin} 接口的便利封装.
  * <p>
  * 插件开发者继承此类而非直接实现 {@link Plugin},主要好处:

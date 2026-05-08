@@ -103,8 +103,8 @@ public class DefaultPluginManagerIT {
         assertEquals(PluginState.STOPPED, manager.getPluginState("com.bingbaihanji.sunsen.core.test.world"));
 
         manager.unloadPlugins();
-        assertEquals(PluginState.UNLOADED, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
-        assertEquals(PluginState.UNLOADED, manager.getPluginState("com.bingbaihanji.sunsen.core.test.world"));
+        assertNull(manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
+        assertNull(manager.getPluginState("com.bingbaihanji.sunsen.core.test.world"));
 
         List<GreetingExtension> extensions = manager.getExtensions(GreetingExtension.class);
         assertTrue(extensions.isEmpty());

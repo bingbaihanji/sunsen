@@ -2,6 +2,7 @@ package com.bingbaihanji.sunsen.demo.plain.world;
 
 import com.bingbaihanji.sunsen.api.PluginState;
 import com.bingbaihanji.sunsen.api.annotation.Extension;
+import com.bingbaihanji.sunsen.api.annotation.Plugin;
 import com.bingbaihanji.sunsen.api.support.AbstractPlugin;
 import com.bingbaihanji.sunsen.demo.plain.Greeter;
 import com.bingbaihanji.sunsen.demo.plain.GreetingFormatter;
@@ -18,6 +19,16 @@ import java.util.Optional;
  *   <li>{@code onStart()} 内访问扩展是安全的：所有插件已 LOADED，扩展全部注册完毕</li>
  * </ul>
  */
+@Plugin(
+        id = "com.bingbaihanji.sunsen.demo.plain.world",
+        name = "World Plugin",
+        version = "1.0.0",
+        packagePrefixes = "com.bingbaihanji.sunsen.demo.plain.world",
+        dependencies = @Plugin.Dependency(
+                id = "com.bingbaihanji.sunsen.demo.plain.hello",
+                version = ">=1.0.0"
+        )
+)
 public class WorldPlugin extends AbstractPlugin {
 
     @Override

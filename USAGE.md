@@ -133,7 +133,53 @@ my-plugin.jar
 │           └── MyExtension.class    ← 扩展实现类,标注 @Extension
 ```
 
-### 3.2 编写 plugin.json
+### 3.2 使用 @Plugin 注解（推荐）
+
+在插件入口类上标注 `@Plugin`,编译时自动生成 `META-INF/plugin.json`,无需手动维护 JSON.
+
+```java
+package com.example.plugin.hello;
+
+import com.bingbaihanji.sunsen.api.annotation.Plugin;
+import com.bingbaihanji.sunsen.api.support.AbstractPlugin;
+
+@Plugin(
+        id = "com.example.plugin.hello",
+        name = "Hello Plugin",
+        description = "提供英语问候能力",
+        version = "1.0.0",
+        packagePrefixes = "com.example.plugin.hello",
+        dependencies = @Plugin.Dependency(
+                id = "com.example.plugin.base",
+                version = ">=1.0.0 <2.0.0"
+        ),
+        permissions = {"file:read", "file:write"}
+)
+public class HelloPlugin extends AbstractPlugin {
+    // ...
+}
+```
+
+**`@Plugin` 属性说明**:
+
+| 属性                | 必填 | 说明                                                    |
+|-------------------|----|-------------------------------------------------------|
+| `id`              | ✅  | 全局唯一标识,建议反向域名格式                                   |
+| `name`            | ✅  | 展示名称                                                  |
+| `version`         | ✅  | SemVer 格式,如 `1.2.0`                                   |
+| `packagePrefixes` | ✅  | 插件私有包前缀,至少提供一个                                     |
+| `description`     | ❌  | 插件描述                                                  |
+| `apiVersion`      | ❌  | 默认空,自动使用框架当前 `SunsenVersion.API_VERSION`              |
+| `mainClass`       | ❌  | 默认空,自动推断为标注类本身                                     |
+| `dependencies`    | ❌  | 依赖插件列表,嵌套 `@Plugin.Dependency`                         |
+| `permissions`     | ❌  | 运行时权限声明                                              |
+| `vendor`          | ❌  | 厂商信息,嵌套 `@Plugin.Vendor`                                |
+
+**兼容手动 plugin.json**:若 `src/main/resources/META-INF/plugin.json` 已存在,Processor 自动跳过,以手动文件为准.
+
+### 3.3 手动编写 plugin.json（备选）
+
+若不想使用注解,可手动在 `src/main/resources/META-INF/plugin.json` 中维护:
 
 ```json
 {
@@ -187,7 +233,7 @@ my-plugin.jar
 | `^1.2.0`       | 兼容版本(等价于 `>=1.2.0 <2.0.0`)    |
 | `~1.2.0`       | 近似版本(等价于 `>=1.2.0 <1.3.0`)    |
 
-### 3.3 实现 Plugin 接口
+### 3.4 实现 Plugin 接口
 
 ```java
 package com.example.plugin.hello;
@@ -237,7 +283,7 @@ public class HelloPlugin implements Plugin {
 
 **插件配置**:框架会自动读取插件工作目录(`pluginsDir/<pluginId>/`)下的 `config.properties` 文件,通过 `PluginContext.getProperty(key)` 访问
 
-### 3.4 实现扩展
+### 3.5 实现扩展
 
 ```java
 package com.example.plugin.hello;
@@ -265,9 +311,12 @@ public class EnglishGreeter implements Greeter {
 
 **`allowMultiple = false` 扩展点**:若扩展点接口标注了 `allowMultiple = false`,同一插件内不能有多个实现类,否则加载时报错
 
-### 3.5 打包插件
+### 3.6 打包插件
 
 插件最终产物是一个包含 `META-INF/plugin.json` 的 **标准 JAR 文件**
+
+- 使用 `@Plugin` 注解时,`plugin.json` 由编译器自动生成到编译输出目录,`maven-jar-plugin` 会将其自动打包入 JAR
+- 手动编写 `plugin.json` 时,将其放在 `src/main/resources/META-INF/plugin.json` 即可
 
 **Maven 示例**:
 
@@ -277,13 +326,7 @@ public class EnglishGreeter implements Greeter {
         <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-jar-plugin</artifactId>
-            <configuration>
-                <archive>
-                    <manifestEntries>
-                        <!-- 无特殊要求,plugin.json 已放在 src/main/resources/META-INF/ 下即可 -->
-                    </manifestEntries>
-                </archive>
-            </configuration>
+            <!-- 使用 @Plugin 注解时无需额外配置,plugin.json 编译期自动生成 -->
         </plugin>
     </plugins>
 </build>

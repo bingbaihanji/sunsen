@@ -113,6 +113,9 @@ public class DefaultPluginManager implements PluginManager {
                 if (descriptorToJar.containsKey(descriptor.id())) {
                     throw new PluginLoadException("Duplicate plugin ID: '" + descriptor.id() + "' found in " + jarPath);
                 }
+                if (plugins.containsKey(descriptor.id())) {
+                    throw new PluginLoadException("Plugin already loaded: '" + descriptor.id() + "' found in " + jarPath);
+                }
                 descriptors.add(descriptor);
                 descriptorToJar.put(descriptor.id(), jarPath);
                 stateMachine.init(descriptor.id(), PluginState.CREATED);
@@ -570,6 +573,7 @@ public class DefaultPluginManager implements PluginManager {
             if (currentState != null && currentState != PluginState.UNLOADED) {
                 stateMachine.transition(pluginId, currentState, PluginState.UNLOADED);
             }
+            stateMachine.remove(pluginId);
         });
 
         // 3. cancel event subscriptions

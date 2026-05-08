@@ -1,6 +1,7 @@
 package com.bingbaihanji.sunsen.demo.plain.scheduler;
 
 import com.bingbaihanji.sunsen.api.annotation.Extension;
+import com.bingbaihanji.sunsen.api.annotation.Plugin;
 import com.bingbaihanji.sunsen.api.support.AbstractPlugin;
 import com.bingbaihanji.sunsen.api.support.ManagedScheduler;
 import com.bingbaihanji.sunsen.demo.plain.GreetingFormatter;
@@ -22,6 +23,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>贡献单一 {@link GreetingFormatter} 实现（{@code allowMultiple=false}）</li>
  * </ul>
  */
+@Plugin(
+        id = "com.bingbaihanji.sunsen.demo.plain.scheduler",
+        name = "Scheduler Plugin",
+        version = "1.0.0",
+        packagePrefixes = "com.bingbaihanji.sunsen.demo.plain.scheduler",
+        permissions = "event:publish"
+)
 public class SchedulerPlugin extends AbstractPlugin {
 
     private ManagedScheduler scheduler;
