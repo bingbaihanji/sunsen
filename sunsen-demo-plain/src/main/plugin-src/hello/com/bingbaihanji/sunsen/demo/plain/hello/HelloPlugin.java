@@ -29,7 +29,9 @@ import java.util.List;
 )
 public class HelloPlugin extends AbstractPlugin {
 
-    /** 问候语后缀，从 config.properties 读取。 */
+    /**
+     * 问候语后缀，从 config.properties 读取。
+     */
     static volatile String greetingSuffix = "";
 
     @Override
@@ -57,8 +59,10 @@ public class HelloPlugin extends AbstractPlugin {
         System.out.println("[HelloPlugin] onStop");
     }
 
-    /** 配置使用枚举的小示例。 */
-    public enum LogLevel { DEBUG, INFO, WARN, ERROR }
+    /**
+     * 配置使用枚举的小示例。
+     */
+    public enum LogLevel {DEBUG, INFO, WARN, ERROR}
 }
 
 @Extension(order = 10, description = "英语问候")

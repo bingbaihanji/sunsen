@@ -70,6 +70,20 @@ public class DefaultPluginManager implements PluginManager {
     }
 
     /**
+     * 检查插件 apiVersion 是否与框架兼容.
+     * 采用 SemVer 解析,只比较 major 版本号,minor 和 patch 级别的变更视为兼容.
+     */
+    private static boolean isApiVersionCompatible(String pluginApiVersion) {
+        try {
+            SemVer framework = SemVer.parse(SunsenVersion.API_VERSION);
+            SemVer plugin = SemVer.parse(pluginApiVersion);
+            return framework.major() == plugin.major();
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    /**
      * 设置插件根目录
      *
      * @param pluginsDir 插件目录路径
@@ -77,6 +91,9 @@ public class DefaultPluginManager implements PluginManager {
     public void setPluginsDir(Path pluginsDir) {
         this.pluginsDir = pluginsDir;
     }
+
+
+    // 批量操作
 
     /**
      * 设置父 ClassLoader
@@ -86,9 +103,6 @@ public class DefaultPluginManager implements PluginManager {
     public void setParentClassLoader(ClassLoader parentClassLoader) {
         this.parentClassLoader = parentClassLoader;
     }
-
-
-    // 批量操作
 
     @Override
     public void loadPlugins() {
@@ -172,6 +186,9 @@ public class DefaultPluginManager implements PluginManager {
         }
     }
 
+
+    // 单插件操作
+
     @Override
     public void unloadPlugins() {
         managementLock.lock();
@@ -183,8 +200,12 @@ public class DefaultPluginManager implements PluginManager {
                 if (state == null || state == PluginState.UNLOADED) {
                     continue;
                 }
-                if (state == PluginState.ACTIVE || state == PluginState.STARTING) {
+                if (state == PluginState.ACTIVE) {
                     stopSinglePlugin(pluginId);
+                } else if (state == PluginState.STARTING) {
+                    // onStart() may be running; force to STOPPED to avoid
+                    // IllegalStateTransitionException in stopSinglePlugin
+                    stateMachine.forceSet(pluginId, PluginState.STOPPED);
                 }
                 unloadSinglePlugin(pluginId);
             }
@@ -192,10 +213,6 @@ public class DefaultPluginManager implements PluginManager {
             managementLock.unlock();
         }
     }
-
-
-    // 单插件操作
-
 
     @Override
     public PluginDescriptor loadPlugin(Path jarPath) {
@@ -258,6 +275,10 @@ public class DefaultPluginManager implements PluginManager {
             PluginState state = stateMachine.getState(pluginId);
             if (state == PluginState.ACTIVE) {
                 stopSinglePlugin(pluginId);
+            } else if (state == PluginState.STARTING) {
+                // onStart() may be running; force to STOPPED to avoid
+                // IllegalStateTransitionException in stopSinglePlugin
+                stateMachine.forceSet(pluginId, PluginState.STOPPED);
             }
             unloadSinglePlugin(pluginId);
             topology.remove(pluginId);
@@ -266,47 +287,48 @@ public class DefaultPluginManager implements PluginManager {
         }
     }
 
+
+    // 查询
+
     @Override
     public void reloadPlugin(String pluginId, Path newJarPath) {
-        PluginEntry oldEntry = plugins.get(pluginId);
-        if (oldEntry == null) {
-            throw new PluginLoadException("Plugin does not exist, cannot reload: " + pluginId);
-        }
-
-        // 1. Pre-load and validate new JAR descriptor
+        // Lock-external: pure I/O and data validation only
         PluginDescriptor newDescriptor = PluginDescriptorLoader.load(newJarPath);
         if (!pluginId.equals(newDescriptor.id())) {
             throw new PluginLoadException("Reload JAR plugin ID (" + newDescriptor.id()
                     + ") does not match target plugin ID (" + pluginId + ")");
         }
-
-        // apiVersion pre-check
         if (!isApiVersionCompatible(newDescriptor.apiVersion())) {
             throw new PluginLoadException(
                     "Reload JAR apiVersion (" + newDescriptor.apiVersion()
                             + ") is incompatible with framework API version (" + SunsenVersion.API_VERSION + ")");
         }
 
-        // Prefix conflict pre-check (exclude old plugin)
-        List<PluginDescriptor> others = new ArrayList<>(getPlugins());
-        others.removeIf(d -> d.id().equals(pluginId));
-        others.add(newDescriptor);
-        PluginClassLoader.validatePrefixes(others);
-
-        // 2. Check if other plugins depend on this one
-        for (PluginEntry entry : plugins.values()) {
-            if (pluginId.equals(entry.descriptor().id())) continue;
-            for (DependencyDescriptor dep : entry.descriptor().dependencies()) {
-                if (pluginId.equals(dep.id())) {
-                    throw new PluginLoadException(
-                            "Plugin " + pluginId + " is depended on by plugin " + entry.descriptor().id()
-                                    + ", cannot reload directly. Unload dependent first.");
-                }
-            }
-        }
-
         managementLock.lock();
         try {
+            // Re-check shared state inside lock to avoid TOCTOU race
+            PluginEntry oldEntry = plugins.get(pluginId);
+            if (oldEntry == null) {
+                throw new PluginLoadException("Plugin does not exist, cannot reload: " + pluginId);
+            }
+
+            // Prefix conflict check (exclude old plugin)
+            List<PluginDescriptor> others = new ArrayList<>(getPlugins());
+            others.removeIf(d -> d.id().equals(pluginId));
+            others.add(newDescriptor);
+            PluginClassLoader.validatePrefixes(others);
+
+            // Check if other plugins depend on this one
+            for (PluginEntry entry : plugins.values()) {
+                if (pluginId.equals(entry.descriptor().id())) continue;
+                for (DependencyDescriptor dep : entry.descriptor().dependencies()) {
+                    if (pluginId.equals(dep.id())) {
+                        throw new PluginLoadException(
+                                "Plugin " + pluginId + " is depended on by plugin " + entry.descriptor().id()
+                                        + ", cannot reload directly. Unload dependent first.");
+                    }
+                }
+            }
             // Phase 1: stop old plugin if ACTIVE (event published outside registry lock)
             if (stateMachine.getState(pluginId) == PluginState.ACTIVE) {
                 stopSinglePlugin(pluginId);
@@ -351,10 +373,6 @@ public class DefaultPluginManager implements PluginManager {
         }
     }
 
-
-    // 查询
-
-
     @Override
     public Optional<PluginDescriptor> getPlugin(String pluginId) {
         PluginEntry entry = plugins.get(pluginId);
@@ -366,28 +384,26 @@ public class DefaultPluginManager implements PluginManager {
         return plugins.values().stream().map(PluginEntry::descriptor).toList();
     }
 
+
+    // 扩展访问
+
     @Override
     public PluginState getPluginState(String pluginId) {
         return stateMachine.getState(pluginId);
     }
-
-
-    // 扩展访问
-
 
     @Override
     public <T> List<T> getExtensions(Class<T> extensionPoint) {
         return extensionRegistry.getExtensions(extensionPoint);
     }
 
+
+    // 事件总线
+
     @Override
     public <T> Optional<T> getExtension(Class<T> extensionPoint, String extensionId) {
         return extensionRegistry.getExtension(extensionPoint, extensionId);
     }
-
-
-    // 事件总线
-
 
     @Override
     public void publishEvent(PluginEvent event) {
@@ -404,15 +420,14 @@ public class DefaultPluginManager implements PluginManager {
         eventBus.unsubscribe(eventType, listener);
     }
 
+
+    // 内部方法
+
     @Override
     public void setExtensionRegistrar(ExtensionRegistrar registrar) {
         this.extensionRegistrar = registrar;
         this.extensionRegistry.setExtensionRegistrar(registrar);
     }
-
-
-    // 内部方法
-
 
     private void loadSinglePlugin(PluginDescriptor descriptor, Path jarPath) {
         loadSinglePluginCore(descriptor, jarPath);
@@ -494,20 +509,6 @@ public class DefaultPluginManager implements PluginManager {
             } catch (IOException ignored) {
             }
             throw e;
-        }
-    }
-
-    /**
-     * 检查插件 apiVersion 是否与框架兼容.
-     * 采用 SemVer 解析,只比较 major 版本号,minor 和 patch 级别的变更视为兼容.
-     */
-    private static boolean isApiVersionCompatible(String pluginApiVersion) {
-        try {
-            SemVer framework = SemVer.parse(SunsenVersion.API_VERSION);
-            SemVer plugin = SemVer.parse(pluginApiVersion);
-            return framework.major() == plugin.major();
-        } catch (IllegalArgumentException e) {
-            return false;
         }
     }
 

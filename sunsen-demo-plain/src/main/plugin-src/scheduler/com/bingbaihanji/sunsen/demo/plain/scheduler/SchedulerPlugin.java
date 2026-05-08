@@ -32,8 +32,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 )
 public class SchedulerPlugin extends AbstractPlugin {
 
-    private ManagedScheduler scheduler;
     private final AtomicInteger tickCount = new AtomicInteger(0);
+    private ManagedScheduler scheduler;
 
     @Override
     protected void onInitialized() {

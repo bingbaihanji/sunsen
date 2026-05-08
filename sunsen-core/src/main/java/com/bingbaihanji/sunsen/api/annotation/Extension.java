@@ -1,7 +1,5 @@
 package com.bingbaihanji.sunsen.api.annotation;
 
-import com.bingbaihanji.sunsen.api.PluginDescriptor;
-
 import java.lang.annotation.*;
 
 /**

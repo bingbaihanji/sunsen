@@ -1,11 +1,6 @@
 package com.bingbaihanji.sunsen.api.support;
 
-import com.bingbaihanji.sunsen.api.Plugin;
-import com.bingbaihanji.sunsen.api.PluginContext;
-import com.bingbaihanji.sunsen.api.PluginDescriptor;
-import com.bingbaihanji.sunsen.api.PluginManager;
-import com.bingbaihanji.sunsen.api.PluginPermissionException;
-import com.bingbaihanji.sunsen.api.PluginState;
+import com.bingbaihanji.sunsen.api.*;
 import com.bingbaihanji.sunsen.api.event.PluginEvent;
 import com.bingbaihanji.sunsen.api.event.PluginEventListener;
 
@@ -55,13 +50,12 @@ import java.util.Optional;
  */
 public abstract class AbstractPlugin implements Plugin {
 
-    private PluginContext context;
-
     /**
      * onDestroy 时需要关闭的托管资源,按注册逆序关闭(LIFO).
      * 所有生命周期方法由框架顺序调用,无需线程安全容器.
      */
     private final List<AutoCloseable> managedResources = new ArrayList<>();
+    private PluginContext context;
 
     // ---- 生命周期 ----
 

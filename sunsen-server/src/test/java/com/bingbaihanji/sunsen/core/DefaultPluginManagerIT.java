@@ -43,6 +43,16 @@ public class DefaultPluginManagerIT {
 
     DefaultPluginManager manager;
 
+    @BeforeAll
+    static void setUpAll() throws Exception {
+        Path fixtureDir = tempDir.resolve("fixtures");
+        Files.createDirectories(fixtureDir);
+
+        Path srcDir = Path.of("src/test/resources/test-plugins");
+        helloJar = TestPluginPackager.packagePlugin(srcDir.resolve("plugin-hello"), fixtureDir);
+        worldJar = TestPluginPackager.packagePlugin(srcDir.resolve("plugin-world"), fixtureDir);
+    }
+
     @AfterEach
     void tearDown() {
         if (manager != null) {
@@ -52,16 +62,6 @@ public class DefaultPluginManagerIT {
             }
             manager = null;
         }
-    }
-
-    @BeforeAll
-    static void setUpAll() throws Exception {
-        Path fixtureDir = tempDir.resolve("fixtures");
-        Files.createDirectories(fixtureDir);
-
-        Path srcDir = Path.of("src/test/resources/test-plugins");
-        helloJar = TestPluginPackager.packagePlugin(srcDir.resolve("plugin-hello"), fixtureDir);
-        worldJar = TestPluginPackager.packagePlugin(srcDir.resolve("plugin-world"), fixtureDir);
     }
 
     @BeforeEach

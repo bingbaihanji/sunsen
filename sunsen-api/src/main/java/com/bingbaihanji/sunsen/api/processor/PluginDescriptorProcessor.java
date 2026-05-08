@@ -28,10 +28,9 @@ public class PluginDescriptorProcessor extends AbstractProcessor {
     private static final String OUTPUT_PATH = "META-INF/plugin.json";
     private static final Pattern PACKAGE_PATTERN = Pattern.compile(
             "[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)*");
-
+    private final AtomicBoolean generated = new AtomicBoolean(false);
     private Messager messager;
     private Filer filer;
-    private final AtomicBoolean generated = new AtomicBoolean(false);
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
