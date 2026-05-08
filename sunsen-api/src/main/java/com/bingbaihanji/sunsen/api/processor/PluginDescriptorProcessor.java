@@ -39,6 +39,29 @@ public class PluginDescriptorProcessor extends AbstractProcessor {
         this.filer = processingEnv.getFiler();
     }
 
+    /**
+     * 处理 {@link Plugin} 注解的核心方法,生成插件描述文件 {@code META-INF/plugin.json}。
+     *
+     * <p>该方法在编译时被注解处理工具调用,扫描所有标注了 {@code @Plugin} 的类,
+     * 执行以下核心步骤：
+     * <ol>
+     *   <li>校验注解中必填字段（{@code id}、{@code name}、{@code version}、{@code packagePrefixes}）的合法性和非空性;</li>
+     *   <li>推断插件主类（优先使用 {@code mainClass()},否则取注解所在类全限定名）;</li>
+     *   <li>确定 API 版本（优先使用 {@code apiVersion()},否则取 {@link SunsenVersion#API_VERSION}）;</li>
+     *   <li>构建 JSON 描述对象,包含插件标识、版本、包隔离前缀、依赖、权限、厂商等信息;</li>
+     *   <li>将 JSON 内容写入编译输出目录下的 {@code META-INF/plugin.json}。</li>
+     * </ol>
+     *
+     * <p>重复生成保护：
+     * <ul>
+     *   <li>使用 {@link AtomicBoolean} 确保同一轮注解处理中只生成一次文件,避免多插件场景下的重复写入;</li>
+     *   <li>若目标文件已存在（例如手动编写或前序处理器创建）,捕获 {@link FilerException} 并跳过生成,不覆盖已有内容。</li>
+     * </ul>
+     *
+     * @param annotations 本轮处理中需要处理的注解类型集合（通常包含 {@link Plugin} 类型）
+     * @param roundEnv    当前注解处理轮次的环境信息,用于查询被注解的元素
+     * @return 如果处理了至少一个 {@code @Plugin} 注解则返回 {@code true},否则返回 {@code false}
+     */
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         if (annotations.isEmpty()) {
