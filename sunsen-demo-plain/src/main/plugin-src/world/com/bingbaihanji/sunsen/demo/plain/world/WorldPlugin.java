@@ -54,10 +54,18 @@ public class WorldPlugin extends AbstractPlugin {
     }
 }
 
-@Extension(order = 20, description = "中文问候")
-class ChineseGreeter implements Greeter {
+@Extension(order = 2, description = "中文问候")
+class ChineseGreeterRude implements Greeter {
     @Override
     public String greet(String name) {
         return "小逼崽子" + name + "你好！";
+    }
+}
+
+@Extension(order = 2, description = "中文问候")
+class ChineseGreeterGent implements Greeter {
+    @Override
+    public String greet(String name) {
+        return name + "先生" + "你好！";
     }
 }

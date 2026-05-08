@@ -59,7 +59,8 @@ public interface Greeter {
 
 - 扩展点接口必须位于**宿主 classpath**(或 sunsen-core 模块),确保所有插件通过父 ClassLoader 共享同一类型
 - `id` 为空时,框架自动使用接口全限定名作为 key
-- `allowMultiple = false` 时,框架会校验所有插件中该扩展点的实现数量恰好为 1,否则拒绝加载
+- `allowMultiple = false` 时,框架会校验**同一插件内**该扩展点的实现数量恰好为 1,否则拒绝加载;跨插件的多个实现仍允许
+- `sole = true` 时,框架确保**整个系统**中只有一个插件的实现被注册,冲突时保留 `order` 最小(优先级最高)的一个,并打印警告
 
 ### 2.2 创建插件管理器
 

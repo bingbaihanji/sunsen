@@ -166,8 +166,9 @@ public class LogTaskHandler implements TaskHandler {
 `ExtensionRegistry`。这意味着**第一个插件的 `onStart()` 被调用时，所有插件的扩展都已经就绪**，彻底杜绝了在 `onStart()`
 里注册扩展导致的时序依赖问题。
 
-**`allowMultiple = false`**：如果扩展点设置了 `allowMultiple = false`，`ExtensionScanner` 会在同一插件内校验该扩展点的实现数量不能超过
-1 个，否则加载失败。
+**`allowMultiple = false`**：如果扩展点设置了 `allowMultiple = false`，`ExtensionScanner` 会在**同一插件内**校验该扩展点的实现数量不能超过 1 个，否则加载失败。跨插件的多个实现是允许的。
+
+**`sole = true`**：如果扩展点设置了 `sole = true`，框架会确保**整个系统**中只有一个插件的实现被注册。当多个插件都提供了实现时，框架打印警告并只保留 `@Extension(order)` 最小（优先级最高）的一个。被舍弃的实现会从注册表中移除，且即使竞争方后续卸载也不会自动恢复。适用于数据库驱动、认证后端等低频变更的基础设施选择。
 
 宿主通过 `pluginManager.getExtensions(TaskHandler.class)` 获取按 `@Extension.order` 排好序的扩展实例列表。
 
@@ -307,9 +308,16 @@ public @interface ExtensionPoint {
 
     /**
      * 是否允许多个扩展实现同时存在。
-     * false 时框架会校验该扩展点实现数量恰好为 1，否则拒绝启动。
+     * false 时框架会校验同一插件内该扩展点的实现数量恰好为 1，否则拒绝启动。
      */
     boolean allowMultiple() default true;
+
+    /**
+     * 是否要求整个系统中只有一个插件实现此扩展点。
+     * true 时若多个插件提供了实现，框架打印警告并只保留 order 最小（优先级最高）的一个。
+     * 被舍弃的实现不会自动恢复，适用于数据库驱动等低频变更场景。
+     */
+    boolean sole() default false;
 }
 ```
 
@@ -824,6 +832,7 @@ getMessage())
 | `PluginContext` 作为权限网关           | Java 21 已经移除了 `SecurityManager`，这是当前最实际的沙箱手段 |
 | `ExtensionRegistry` 读写锁          | 热重载期间扩展替换是原子的，读操作不会被阻塞                       |
 | `afterExtensionDestroyed` 钩子     | 热重载语义完整性的基础，防止宿主容器持有悬空引用导致内存泄漏               |
+| `sole` 与 `allowMultiple` 正交设计      | `allowMultiple` 管单个插件内， `sole` 管跨插件全局，两者不重叠，语义清晰          |
 | 事件总线内置于框架                        | 插件间解耦通信，避免直接类引用跨越 ClassLoader 边界             |
 | `PluginDescriptor` 用 record      | 不可变，天然线程安全，省掉一堆样板代码                          |
 | CAS 状态机                          | 状态转换并发安全，不会出现竞态条件                            |

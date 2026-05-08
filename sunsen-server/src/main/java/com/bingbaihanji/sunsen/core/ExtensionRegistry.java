@@ -3,6 +3,7 @@ package com.bingbaihanji.sunsen.core;
 import com.bingbaihanji.sunsen.api.ExtensionRegistrar;
 import com.bingbaihanji.sunsen.api.PluginDescriptor;
 import com.bingbaihanji.sunsen.api.annotation.Extension;
+import com.bingbaihanji.sunsen.api.annotation.ExtensionPoint;
 
 import java.lang.reflect.Constructor;
 import java.util.*;
@@ -89,10 +90,52 @@ public class ExtensionRegistry {
             entry = new ExtensionEntry<>(null, extensionId, order, descriptor.id(), false, getConstructor(implClass), extensionPointType);
         }
 
+        ExtensionPoint ep = extensionPointType.getAnnotation(ExtensionPoint.class);
+        boolean isSole = ep != null && ep.sole();
+
         lock.writeLock().lock();
         try {
             String key = extensionPointType.getName();
             List<ExtensionEntry<?>> list = entries.computeIfAbsent(key, k -> new ArrayList<>());
+
+            // sole 扩展点：全局只能有一个插件实现，冲突时保留 order 最小（优先级最高）的
+            if (isSole && !list.isEmpty()) {
+                ExtensionEntry<?> existing = list.get(0);
+                if (!existing.pluginId().equals(descriptor.id())) {
+                    if (order < existing.order()) {
+                        LOGGER.log(System.Logger.Level.WARNING,
+                                () -> String.format("Sole extension point '%s' has multiple plugin implementations: " +
+                                                "plugin '%s'(order=%d) and plugin '%s'(order=%d). Keeping '%s' with higher priority.",
+                                        key, existing.pluginId(), existing.order(),
+                                        descriptor.id(), order, descriptor.id()));
+                        if (registrar != null && existing.singleton()) {
+                            try {
+                                registrar.afterExtensionDestroyed(existing.getInstance(), extensionPointType);
+                            } catch (Exception ex) {
+                                LOGGER.log(System.Logger.Level.ERROR,
+                                        () -> "ExtensionRegistrar.afterExtensionDestroyed callback error: " + existing.extensionId(), ex);
+                            }
+                        }
+                        list.clear();
+                    } else {
+                        LOGGER.log(System.Logger.Level.WARNING,
+                                () -> String.format("Sole extension point '%s' has multiple plugin implementations: " +
+                                                "plugin '%s'(order=%d) and plugin '%s'(order=%d). Keeping '%s' with higher priority.",
+                                        key, existing.pluginId(), existing.order(),
+                                        descriptor.id(), order, existing.pluginId()));
+                        if (registrar != null && entry.singleton()) {
+                            try {
+                                registrar.afterExtensionDestroyed(entry.getInstance(), extensionPointType);
+                            } catch (Exception ex) {
+                                LOGGER.log(System.Logger.Level.ERROR,
+                                        () -> "ExtensionRegistrar.afterExtensionDestroyed callback error: " + entry.extensionId(), ex);
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
+
             // 按 order 升序插入
             int index = 0;
             for (; index < list.size(); index++) {
