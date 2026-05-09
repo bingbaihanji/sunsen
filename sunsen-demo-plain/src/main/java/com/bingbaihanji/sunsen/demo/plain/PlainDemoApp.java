@@ -8,11 +8,19 @@ import com.bingbaihanji.sunsen.api.event.builtin.PluginStartedEvent;
 import com.bingbaihanji.sunsen.api.event.builtin.PluginStoppedEvent;
 import com.bingbaihanji.sunsen.api.event.builtin.PluginUnloadedEvent;
 import com.bingbaihanji.sunsen.core.DefaultPluginManager;
+import com.bingbaihanji.sunsen.core.PluginWatcher;
 import com.bingbaihanji.sunsen.demo.plain.event.GreetingEvent;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+
+import static java.util.concurrent.TimeUnit.HOURS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * Sunsen 纯 Java 宿主演示程序
@@ -28,7 +36,11 @@ import java.util.Optional;
  */
 public class PlainDemoApp {
 
-    public static void main(String[] args) throws InterruptedException {
+    private ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+
+    Runnable task = () -> {
+
         Path pluginsDir = Path.of("sunsen-demo-plain/target/plugins");
         if (!java.nio.file.Files.exists(pluginsDir)) {
             // 兼容在模块根目录运行
@@ -103,7 +115,11 @@ public class PlainDemoApp {
 
         // 7. 等待 3 秒观察 SchedulerPlugin 的定时 tick → GreetingEvent → HelloPlugin 接收
         System.out.println("\n--- 5) 等待 3 秒观察 scheduler tick ---");
-        Thread.sleep(3000);
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
         // 8. 停止 + 卸载
         System.out.println("\n--- 6) stopPlugins() ---");
@@ -113,5 +129,28 @@ public class PlainDemoApp {
         manager.unloadPlugins();
 
         System.out.println("\n=== 演示结束 ===");
+
+
+        try (PluginWatcher watcher = new PluginWatcher(manager)) {
+            System.out.println("已开启自动检测");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+
+    };
+
+    private void loop() {
+        ScheduledFuture<?> beeperHandle = scheduler.scheduleAtFixedRate(task ,5 , 20, SECONDS);
+        Runnable canceller = () -> beeperHandle.cancel(false);
+        scheduler.schedule(canceller, 1, HOURS);
+
     }
+
+    public static void main(String[] args) {
+        PlainDemoApp  app = new PlainDemoApp();
+        app.loop();
+    }
+
+
 }

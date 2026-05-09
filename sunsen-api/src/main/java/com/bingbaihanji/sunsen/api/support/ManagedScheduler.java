@@ -3,6 +3,7 @@ package com.bingbaihanji.sunsen.api.support;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -57,7 +58,7 @@ public final class ManagedScheduler implements AutoCloseable {
             throw new IllegalArgumentException("poolSize must be >= 1, got: " + poolSize);
         }
         AtomicInteger counter = new AtomicInteger(0);
-        ScheduledExecutorService svc = Executors.newScheduledThreadPool(poolSize, r -> {
+        return create(pluginId, poolSize, r -> {
             String name = poolSize == 1
                     ? "plugin-scheduler-" + pluginId
                     : "plugin-scheduler-" + pluginId + "-" + counter.incrementAndGet();
@@ -65,7 +66,29 @@ public final class ManagedScheduler implements AutoCloseable {
             t.setDaemon(true);
             return t;
         });
-        return new ManagedScheduler(svc);
+    }
+
+    /**
+     * 使用指定 {@link ThreadFactory} 创建调度器.
+     * <p>
+     * 配合 {@link com.bingbaihanji.sunsen.api.support.AbstractPlugin#threadFactory()} 使用,
+     * 确保调度器线程归属于插件专属 ThreadGroup,插件卸载时会被统一中断:
+     * <pre>{@code
+     * ManagedScheduler scheduler = manage(
+     *     ManagedScheduler.create(pluginId(), 1, threadFactory())
+     * );
+     * }</pre>
+     *
+     * @param pluginId 所属插件 ID(仅用于日志/异常信息)
+     * @param poolSize 线程数
+     * @param factory  自定义线程工厂
+     * @throws IllegalArgumentException poolSize &lt; 1
+     */
+    public static ManagedScheduler create(String pluginId, int poolSize, ThreadFactory factory) {
+        if (poolSize < 1) {
+            throw new IllegalArgumentException("poolSize must be >= 1, got: " + poolSize);
+        }
+        return new ManagedScheduler(Executors.newScheduledThreadPool(poolSize, factory));
     }
 
     // ---- 任务调度 ----

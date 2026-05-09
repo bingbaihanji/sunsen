@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * 所有插件入口必须继承此抽象类
@@ -166,6 +167,15 @@ public abstract class AbstractPlugin implements Plugin {
         return context.getProperty(key, defaultValue);
     }
 
+    /**
+     * 重新从工作目录的 {@code config.properties} 加载配置.
+     * <p>
+     * 调用后，{@link #property(String)} 等方法将读取到最新值.
+     */
+    protected final void reloadConfig() {
+        context.reloadConfig();
+    }
+
     // ---- 扩展 ----
 
     /**
@@ -183,6 +193,15 @@ public abstract class AbstractPlugin implements Plugin {
     protected final <T> Optional<T> firstExtension(Class<T> extensionPoint) {
         List<T> list = context.getExtensions(extensionPoint);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.getFirst());
+    }
+
+    /**
+     * 获取指定扩展点的元数据列表,不持有扩展实例引用.
+     * <p>
+     * 适合只需要查看已注册扩展的 id、order、description 等元数据而无需调用扩展的场景.
+     */
+    protected final <T> List<ExtensionInfo> extensionInfos(Class<T> extensionPoint) {
+        return context.getExtensionInfos(extensionPoint);
     }
 
     // ---- 事件 ----
@@ -221,6 +240,30 @@ public abstract class AbstractPlugin implements Plugin {
             throw new PluginPermissionException(
                     pluginId() + " 未声明所需权限: " + permission);
         }
+    }
+
+    // ---- 线程管理 ----
+
+    /**
+     * 返回插件专属 {@link ThreadFactory}.
+     * <p>
+     * 通过此工厂创建的线程以 {@code <pluginId>-thread-N} 格式命名,设为守护线程,
+     * 并归属于插件专属 {@link ThreadGroup};插件卸载时框架会统一中断这些线程.
+     */
+    protected final ThreadFactory threadFactory() {
+        return context().getThreadFactory();
+    }
+
+    /**
+     * 使用插件专属工厂创建并启动一个守护线程.
+     *
+     * @param task 线程任务
+     * @return 已启动的线程
+     */
+    protected final Thread newThread(Runnable task) {
+        Thread t = threadFactory().newThread(task);
+        t.start();
+        return t;
     }
 
     // ---- 插件管理 ----

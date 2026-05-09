@@ -20,6 +20,15 @@ public interface PluginManager {
     void loadPlugins();
 
     /**
+     * 与 {@link #loadPlugins()} 行为相同,但同时收集加载失败的结果并返回.
+     * <p>
+     * 加载失败的插件不影响其他插件的加载,失败信息通过返回值提供给调用方.
+     *
+     * @return 所有加载失败项的列表;全部成功则返回空列表
+     */
+    List<PluginLoadError> loadPluginsWithResult();
+
+    /**
      * 按拓扑顺序批量启动所有 LOADED 状态的插件
      */
     void startPlugins();
@@ -64,8 +73,37 @@ public interface PluginManager {
 
     /**
      * 原子性热替换:stop → unload → load(新 JAR)→ start
+     * <p>
+     * 若新 JAR 加载失败,框架将自动尝试用原 JAR 回滚.
      */
     void reloadPlugin(String pluginId, Path newJarPath);
+
+    /**
+     * 使用原 JAR 路径原地热重载.
+     * <p>
+     * 适用于外部工具已将 JAR 替换完毕,需通知框架重新加载的场景.
+     */
+    void reloadPlugin(String pluginId);
+
+    /**
+     * 将外部 JAR 复制到插件目录并加载启动.
+     * <p>
+     * 等价于:复制 JAR → {@link #loadPlugin(Path)} → {@link #startPlugin(String)}.
+     * 成功后发布 {@code PluginInstalledEvent}.
+     *
+     * @param source 源 JAR 文件路径,可以位于插件目录之外
+     */
+    void installPlugin(Path source);
+
+    /**
+     * 停止并卸载插件,同时删除对应的 JAR 文件.
+     * <p>
+     * 等价于:{@link #stopPlugin(String)} → {@link #unloadPlugin(String)} → 删除 JAR.
+     * 成功后发布 {@code PluginUninstalledEvent}.
+     *
+     * @param pluginId 要卸载的插件 ID
+     */
+    void uninstallPlugin(String pluginId);
 
     //   查询    
 
@@ -83,14 +121,34 @@ public interface PluginManager {
     List<PluginDescriptor> getPlugins();
 
     /**
+     * 按状态过滤已加载的插件描述符列表
+     *
+     * @param state 目标状态
+     */
+    default List<PluginDescriptor> getPlugins(PluginState state) {
+        return getPlugins().stream()
+                .filter(d -> state == getPluginState(d.id()))
+                .toList();
+    }
+
+    /**
+     * 判断指定插件是否处于 ACTIVE 状态
+     *
+     * @param pluginId 插件 ID
+     */
+    default boolean isPluginActive(String pluginId) {
+        return getPluginState(pluginId) == PluginState.ACTIVE;
+    }
+
+    /**
      * 获取指定插件的当前状态
      *
      * @param pluginId 插件 ID
-     * @return 插件状态
+     * @return 插件状态,插件未知时返回 {@code null}
      */
     PluginState getPluginState(String pluginId);
 
-    //   扩展访问  
+    //   扩展访问
 
     /**
      * 返回指定扩展点的所有实现,按 @Extension.order 升序排列
@@ -101,6 +159,16 @@ public interface PluginManager {
      * 按 id 精确获取单个扩展实例
      */
     <T> Optional<T> getExtension(Class<T> extensionPoint, String extensionId);
+
+    /**
+     * 获取指定扩展点的元数据列表,不持有扩展实例引用.
+     * <p>
+     * 适用于管理界面、监控日志等只需要元数据而不调用扩展逻辑的场景.
+     *
+     * @param extensionPoint 扩展点接口类型
+     * @return 按 order 升序排列的 {@link ExtensionInfo} 列表
+     */
+    <T> List<ExtensionInfo> getExtensionInfos(Class<T> extensionPoint);
 
     //   事件总线  
 

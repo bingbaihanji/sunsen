@@ -161,6 +161,56 @@ public class DependencyResolver {
     }
 
     /**
+     * 对给定插件列表执行分层拓扑排序,同一层内的插件互相无依赖关系,可并行加载.
+     * <p>
+     * 与 {@link #sort(List)} 使用相同的 Kahn BFS 算法,区别在于每一轮同时处理所有零入度节点,
+     * 将它们作为一个波次(wave)输出,然后再推进到下一波次.
+     *
+     * @return 按依赖顺序排列的波次列表;同一波次内的插件可安全地并行加载
+     */
+    public List<List<PluginDescriptor>> sortByLevels(List<PluginDescriptor> all) {
+        Map<String, PluginDescriptor> idMap = buildIdMap(all);
+        Map<String, Integer> inDegree = new HashMap<>();
+        Map<String, List<String>> adj = buildRevAdj(all, idMap, inDegree);
+
+        List<String> zeroQueue = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : inDegree.entrySet()) {
+            if (entry.getValue() == 0) zeroQueue.add(entry.getKey());
+        }
+
+        List<List<PluginDescriptor>> levels = new ArrayList<>();
+        int processed = 0;
+        while (!zeroQueue.isEmpty()) {
+            List<PluginDescriptor> wave = new ArrayList<>(zeroQueue.size());
+            List<String> nextQueue = new ArrayList<>();
+            for (String id : zeroQueue) {
+                wave.add(idMap.get(id));
+                for (String next : adj.get(id)) {
+                    int newDegree = inDegree.get(next) - 1;
+                    inDegree.put(next, newDegree);
+                    if (newDegree == 0) nextQueue.add(next);
+                }
+            }
+            processed += wave.size();
+            levels.add(wave);
+            zeroQueue = nextQueue;
+        }
+
+        if (processed != all.size()) {
+            Set<String> sorted = new HashSet<>();
+            for (List<PluginDescriptor> wave : levels) {
+                for (PluginDescriptor d : wave) sorted.add(d.id());
+            }
+            List<String> remaining = new ArrayList<>();
+            for (PluginDescriptor d : all) {
+                if (!sorted.contains(d.id())) remaining.add(d.id());
+            }
+            throw new CircularDependencyException(remaining);
+        }
+        return levels;
+    }
+
+    /**
      * 使用 DFS 检测循环依赖
      */
     private void detectCycles(List<PluginDescriptor> all, Map<String, PluginDescriptor> idMap) {

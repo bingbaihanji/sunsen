@@ -12,6 +12,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -92,6 +93,13 @@ public class DefaultPluginManager implements PluginManager {
         this.pluginsDir = pluginsDir;
     }
 
+    /**
+     * 获取插件根目录
+     */
+    public Path getPluginsDir() {
+        return pluginsDir;
+    }
+
 
     // 批量操作
 
@@ -106,9 +114,23 @@ public class DefaultPluginManager implements PluginManager {
 
     @Override
     public void loadPlugins() {
+        loadPluginsInternal();
+    }
+
+    @Override
+    public List<PluginLoadError> loadPluginsWithResult() {
+        return loadPluginsInternal();
+    }
+
+    /**
+     * 共用加载逻辑,返回所有加载失败项.
+     */
+    private List<PluginLoadError> loadPluginsInternal() {
+        List<PluginLoadError> errors = new ArrayList<>();
+
         if (!Files.exists(pluginsDir)) {
             LOGGER.log(System.Logger.Level.WARNING, () -> "Plugin directory not found: " + pluginsDir);
-            return;
+            return errors;
         }
 
         List<Path> jarPaths = new ArrayList<>();
@@ -125,42 +147,83 @@ public class DefaultPluginManager implements PluginManager {
             try {
                 PluginDescriptor descriptor = PluginDescriptorLoader.load(jarPath);
                 if (descriptorToJar.containsKey(descriptor.id())) {
-                    throw new PluginLoadException("Duplicate plugin ID: '" + descriptor.id() + "' found in " + jarPath);
+                    PluginLoadException ex = new PluginLoadException(
+                            "Duplicate plugin ID: '" + descriptor.id() + "' found in " + jarPath);
+                    errors.add(new PluginLoadError(descriptor.id(), jarPath, ex));
+                    LOGGER.log(System.Logger.Level.ERROR, () -> "Parse plugin failed: " + jarPath, ex);
+                    continue;
                 }
                 if (plugins.containsKey(descriptor.id())) {
-                    throw new PluginLoadException("Plugin already loaded: '" + descriptor.id() + "' found in " + jarPath);
+                    PluginLoadException ex = new PluginLoadException(
+                            "Plugin already loaded: '" + descriptor.id() + "' found in " + jarPath);
+                    errors.add(new PluginLoadError(descriptor.id(), jarPath, ex));
+                    LOGGER.log(System.Logger.Level.ERROR, () -> "Parse plugin failed: " + jarPath, ex);
+                    continue;
                 }
                 descriptors.add(descriptor);
                 descriptorToJar.put(descriptor.id(), jarPath);
                 stateMachine.init(descriptor.id(), PluginState.CREATED);
             } catch (Exception e) {
+                errors.add(new PluginLoadError(jarPath.getFileName().toString(), jarPath, e));
                 LOGGER.log(System.Logger.Level.ERROR, () -> "Parse plugin failed: " + jarPath, e);
             }
         }
 
         if (descriptors.isEmpty()) {
-            return;
+            return errors;
         }
 
         PluginClassLoader.validatePrefixes(descriptors);
         dependencyResolver.resolve(descriptors);
-        List<PluginDescriptor> sorted = dependencyResolver.sort(descriptors);
+        List<List<PluginDescriptor>> waves = dependencyResolver.sortByLevels(descriptors);
 
-        managementLock.lock();
-        try {
-            for (PluginDescriptor descriptor : sorted) {
+        for (List<PluginDescriptor> wave : waves) {
+            // 波次内用虚拟线程并行加载：loadSinglePlugin 内部所有操作均线程安全
+            List<Thread> waveThreads = new ArrayList<>(wave.size());
+            // 线程安全的错误收集
+            List<PluginLoadError> waveErrors = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+            for (PluginDescriptor descriptor : wave) {
+                Path jarPath = descriptorToJar.get(descriptor.id());
+                Thread t = Thread.ofVirtual().start(() -> {
+                    try {
+                        loadSinglePlugin(descriptor, jarPath);
+                    } catch (Exception e) {
+                        waveErrors.add(new PluginLoadError(descriptor.id(), jarPath, e));
+                        LOGGER.log(System.Logger.Level.ERROR, () -> "Load plugin failed: " + descriptor.id(), e);
+                        stateMachine.forceSet(descriptor.id(), PluginState.FAILED);
+                        eventBus.publish(new PluginFailedEvent(descriptor, PluginState.CREATED, e));
+                    }
+                });
+                waveThreads.add(t);
+            }
+
+            // 等待波次所有线程完成
+            for (Thread t : waveThreads) {
                 try {
-                    loadSinglePlugin(descriptor, descriptorToJar.get(descriptor.id()));
-                    topology.add(descriptor.id());
-                } catch (Exception e) {
-                    LOGGER.log(System.Logger.Level.ERROR, () -> "Load plugin failed: " + descriptor.id(), e);
-                    stateMachine.forceSet(descriptor.id(), PluginState.FAILED);
-                    eventBus.publish(new PluginFailedEvent(descriptor, PluginState.CREATED, e));
+                    t.join();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new PluginLoadException("Interrupted while waiting for plugin wave to load", e);
                 }
             }
-        } finally {
-            managementLock.unlock();
+
+            errors.addAll(waveErrors);
+
+            // 波次完成后串行更新 topology（仅成功 LOADED 的插件，按原始顺序追加）
+            managementLock.lock();
+            try {
+                for (PluginDescriptor descriptor : wave) {
+                    if (stateMachine.getState(descriptor.id()) == PluginState.LOADED) {
+                        topology.add(descriptor.id());
+                    }
+                }
+            } finally {
+                managementLock.unlock();
+            }
         }
+
+        return errors;
     }
 
     @Override
@@ -217,10 +280,8 @@ public class DefaultPluginManager implements PluginManager {
     @Override
     public PluginDescriptor loadPlugin(Path jarPath) {
         PluginDescriptor descriptor = PluginDescriptorLoader.load(jarPath);
-        if (plugins.containsKey(descriptor.id())) {
-            throw new PluginLoadException("Plugin already exists: " + descriptor.id());
-        }
-        // Combine new plugin with already loaded ones for prefix and dependency validation
+
+        // Combine new plugin with already loaded ones for prefix and dependency validation (outside lock, read-only)
         List<PluginDescriptor> allDescriptors = new ArrayList<>(getPlugins());
         allDescriptors.add(descriptor);
         PluginClassLoader.validatePrefixes(allDescriptors);
@@ -230,15 +291,12 @@ public class DefaultPluginManager implements PluginManager {
 
         managementLock.lock();
         try {
-            loadSinglePlugin(descriptor, jarPath);
-
-            // Recalculate topological order
-            List<PluginDescriptor> refreshed = new ArrayList<>(getPlugins());
-            List<PluginDescriptor> sorted = dependencyResolver.sort(refreshed);
-            topology.clear();
-            for (PluginDescriptor d : sorted) {
-                topology.add(d.id());
+            // Double-check inside lock to avoid TOCTOU race
+            if (plugins.containsKey(descriptor.id())) {
+                throw new PluginLoadException("Plugin already exists: " + descriptor.id());
             }
+            loadSinglePlugin(descriptor, jarPath);
+            rebuildTopology();
             return descriptor;
         } finally {
             managementLock.unlock();
@@ -281,7 +339,7 @@ public class DefaultPluginManager implements PluginManager {
                 stateMachine.forceSet(pluginId, PluginState.STOPPED);
             }
             unloadSinglePlugin(pluginId);
-            topology.remove(pluginId);
+            rebuildTopology();
         } finally {
             managementLock.unlock();
         }
@@ -334,14 +392,46 @@ public class DefaultPluginManager implements PluginManager {
                 stopSinglePlugin(pluginId);
             }
 
-            // Phase 2: core unload without events
+            // Phase 2: core unload without events (keep oldJarPath for rollback)
+            Path oldJarPath = oldEntry.jarPath();
             PluginDescriptor oldDescriptor = doUnloadSinglePlugin(pluginId);
 
             // Phase 3: atomically unregister old extensions and register new ones inside write lock
-            extensionRegistry.withWriteLock(() -> {
-                stateMachine.init(newDescriptor.id(), PluginState.CREATED);
-                loadSinglePluginCore(newDescriptor, newJarPath);
-            });
+            try {
+                extensionRegistry.withWriteLock(() -> {
+                    stateMachine.init(newDescriptor.id(), PluginState.CREATED);
+                    loadSinglePluginCore(newDescriptor, newJarPath);
+                });
+            } catch (Exception loadException) {
+                // Rollback: try to restore old plugin from its original JAR
+                LOGGER.log(System.Logger.Level.WARNING,
+                        () -> "Plugin reload failed for " + pluginId + ", attempting rollback to " + oldJarPath,
+                        loadException);
+                boolean rolledBack = false;
+                if (oldDescriptor != null && oldJarPath != null && Files.exists(oldJarPath)) {
+                    try {
+                        extensionRegistry.withWriteLock(() -> {
+                            stateMachine.init(pluginId, PluginState.CREATED);
+                            loadSinglePluginCore(oldDescriptor, oldJarPath);
+                        });
+                        startSinglePlugin(pluginId);
+                        rolledBack = true;
+                        LOGGER.log(System.Logger.Level.INFO,
+                                () -> "Plugin " + pluginId + " successfully rolled back to " + oldJarPath);
+                    } catch (Exception rollbackEx) {
+                        LOGGER.log(System.Logger.Level.ERROR,
+                                () -> "Rollback failed for plugin " + pluginId, rollbackEx);
+                        stateMachine.forceSet(pluginId, PluginState.FAILED);
+                        if (oldDescriptor != null) {
+                            eventBus.publish(new PluginFailedEvent(oldDescriptor, PluginState.LOADED, rollbackEx));
+                        }
+                    }
+                }
+                if (!rolledBack && oldDescriptor != null) {
+                    eventBus.publish(new PluginUnloadedEvent(oldDescriptor));
+                }
+                throw new PluginLoadException("Plugin reload failed: " + pluginId, loadException);
+            }
 
             // Phase 4: update ClassLoader references for plugins that depend on the reloaded one
             for (PluginEntry entry : plugins.values()) {
@@ -362,12 +452,14 @@ public class DefaultPluginManager implements PluginManager {
 
             // Phase 5: start new plugin
             startSinglePlugin(pluginId);
+            rebuildTopology();
 
             // Phase 6: publish events outside registry write lock to avoid dead lock
             if (oldDescriptor != null) {
                 eventBus.publish(new PluginUnloadedEvent(oldDescriptor));
             }
             eventBus.publish(new PluginLoadedEvent(newDescriptor));
+            eventBus.publish(new PluginReloadedEvent(oldDescriptor, newDescriptor));
         } finally {
             managementLock.unlock();
         }
@@ -397,13 +489,93 @@ public class DefaultPluginManager implements PluginManager {
         return extensionRegistry.getExtensions(extensionPoint);
     }
 
-
-    // 事件总线
-
     @Override
     public <T> Optional<T> getExtension(Class<T> extensionPoint, String extensionId) {
         return extensionRegistry.getExtension(extensionPoint, extensionId);
     }
+
+    @Override
+    public <T> List<ExtensionInfo> getExtensionInfos(Class<T> extensionPoint) {
+        return extensionRegistry.getExtensionInfos(extensionPoint);
+    }
+
+    @Override
+    public void reloadPlugin(String pluginId) {
+        PluginEntry entry = plugins.get(pluginId);
+        if (entry == null) {
+            throw new PluginLoadException("Plugin does not exist, cannot reload: " + pluginId);
+        }
+        reloadPlugin(pluginId, entry.jarPath());
+    }
+
+    @Override
+    public void installPlugin(Path source) {
+        if (!Files.exists(source)) {
+            throw new PluginLoadException("Source JAR does not exist: " + source);
+        }
+        try {
+            Files.createDirectories(pluginsDir);
+        } catch (IOException e) {
+            throw new PluginLoadException("Cannot create plugins directory: " + pluginsDir, e);
+        }
+
+        Path dest = pluginsDir.resolve(source.getFileName());
+        try {
+            Files.copy(source, dest, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new PluginLoadException("Cannot copy plugin JAR to " + dest, e);
+        }
+
+        PluginDescriptor descriptor;
+        try {
+            descriptor = loadPlugin(dest);
+            startPlugin(descriptor.id());
+        } catch (Exception e) {
+            // Clean up copied JAR on failure
+            try {
+                Files.deleteIfExists(dest);
+            } catch (IOException ignored) {
+            }
+            throw e;
+        }
+
+        eventBus.publish(new PluginInstalledEvent(descriptor, dest));
+    }
+
+    @Override
+    public void uninstallPlugin(String pluginId) {
+        PluginEntry entry = plugins.get(pluginId);
+        if (entry == null) {
+            throw new PluginLoadException("Plugin does not exist, cannot uninstall: " + pluginId);
+        }
+        PluginDescriptor descriptor = entry.descriptor();
+        Path jarPath = entry.jarPath();
+
+        managementLock.lock();
+        try {
+            PluginState state = stateMachine.getState(pluginId);
+            if (state == PluginState.ACTIVE) {
+                stopSinglePlugin(pluginId);
+            }
+            unloadSinglePlugin(pluginId);
+            rebuildTopology();
+        } finally {
+            managementLock.unlock();
+        }
+
+        // Delete JAR after ClassLoader is closed and all references are released
+        try {
+            Files.deleteIfExists(jarPath);
+        } catch (IOException e) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    () -> "Cannot delete plugin JAR: " + jarPath + " for plugin " + pluginId, e);
+        }
+
+        eventBus.publish(new PluginUninstalledEvent(descriptor));
+    }
+
+
+    // 事件总线
 
     @Override
     public void publishEvent(PluginEvent event) {
@@ -427,6 +599,19 @@ public class DefaultPluginManager implements PluginManager {
     public void setExtensionRegistrar(ExtensionRegistrar registrar) {
         this.extensionRegistrar = registrar;
         this.extensionRegistry.setExtensionRegistrar(registrar);
+    }
+
+    /**
+     * 根据当前 plugins 快照重建拓扑顺序.
+     * 调用方必须持有 managementLock.
+     */
+    private void rebuildTopology() {
+        List<PluginDescriptor> current = new ArrayList<>(getPlugins());
+        topology.clear();
+        if (current.isEmpty()) return;
+        for (PluginDescriptor d : dependencyResolver.sort(current)) {
+            topology.add(d.id());
+        }
     }
 
     private void loadSinglePlugin(PluginDescriptor descriptor, Path jarPath) {
@@ -488,8 +673,9 @@ public class DefaultPluginManager implements PluginManager {
                 LOGGER.log(System.Logger.Level.WARNING, () -> "Cannot create work directory: " + workDir, e);
             }
 
+            ThreadGroup threadGroup = new ThreadGroup("plugin-" + pluginId);
             DefaultPluginContext context = new DefaultPluginContext(
-                    descriptor, extensionRegistry, eventBus, this, workDir
+                    descriptor, extensionRegistry, eventBus, this, workDir, threadGroup
             );
             contextHolder[0] = context;
 
@@ -498,7 +684,7 @@ public class DefaultPluginManager implements PluginManager {
             // Scan extensions
             extensionScanner.scan(descriptor, classLoader);
 
-            plugins.put(pluginId, new PluginEntry(descriptor, pluginInstance, classLoader, context, jarPath));
+            plugins.put(pluginId, new PluginEntry(descriptor, pluginInstance, classLoader, context, jarPath, threadGroup));
             stateMachine.transition(pluginId, PluginState.RESOLVED, PluginState.LOADED);
         } catch (Exception e) {
             if (contextHolder[0] != null) {
@@ -567,6 +753,9 @@ public class DefaultPluginManager implements PluginManager {
             LOGGER.log(System.Logger.Level.WARNING, () -> "Plugin onDestroy error: " + pluginId, e);
         }
 
+        // 1b. interrupt all threads created via the plugin's ThreadFactory
+        entry.threadGroup().interrupt();
+
         // 2. complete unregistration and state transition inside ExtensionRegistry write lock
         extensionRegistry.withWriteLock(() -> {
             extensionRegistry.unregisterPlugin(pluginId);
@@ -602,11 +791,13 @@ public class DefaultPluginManager implements PluginManager {
      * @param classLoader 插件专用类加载器
      * @param context     插件运行时上下文
      * @param jarPath     插件 JAR 文件路径
+     * @param threadGroup 插件专属线程组,卸载时用于统一中断
      */
     private record PluginEntry(PluginDescriptor descriptor,
                                Plugin plugin,
                                PluginClassLoader classLoader,
                                DefaultPluginContext context,
-                               Path jarPath) {
+                               Path jarPath,
+                               ThreadGroup threadGroup) {
     }
 }

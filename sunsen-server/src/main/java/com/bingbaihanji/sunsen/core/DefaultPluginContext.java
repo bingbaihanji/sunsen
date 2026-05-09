@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * {@link PluginContext} 的默认实现
@@ -32,6 +34,10 @@ public class DefaultPluginContext implements PluginContext {
     private final Properties configProperties = new Properties();
     // 本上下文注册的事件订阅列表
     private final List<Subscription<?>> subscriptions = new CopyOnWriteArrayList<>();
+    // 插件专属线程组,卸载时统一 interrupt
+    private final ThreadGroup threadGroup;
+    // 线程命名计数器
+    private final AtomicInteger threadCounter = new AtomicInteger(0);
 
     /**
      * @param descriptor        插件描述符
@@ -39,17 +45,20 @@ public class DefaultPluginContext implements PluginContext {
      * @param eventBus          事件总线
      * @param pluginManager     插件管理器
      * @param pluginWorkDir     插件工作目录
+     * @param threadGroup       插件专属线程组
      */
     public DefaultPluginContext(PluginDescriptor descriptor,
                                 ExtensionRegistry extensionRegistry,
                                 PluginEventBus eventBus,
                                 PluginManager pluginManager,
-                                Path pluginWorkDir) {
+                                Path pluginWorkDir,
+                                ThreadGroup threadGroup) {
         this.descriptor = descriptor;
         this.extensionRegistry = extensionRegistry;
         this.eventBus = eventBus;
         this.pluginManager = pluginManager;
         this.pluginWorkDir = pluginWorkDir;
+        this.threadGroup = threadGroup;
         loadConfig();
     }
 
@@ -86,8 +95,19 @@ public class DefaultPluginContext implements PluginContext {
     }
 
     @Override
+    public void reloadConfig() {
+        configProperties.clear();
+        loadConfig();
+    }
+
+    @Override
     public <T> List<T> getExtensions(Class<T> extensionPoint) {
         return extensionRegistry.getExtensions(extensionPoint);
+    }
+
+    @Override
+    public <T> List<ExtensionInfo> getExtensionInfos(Class<T> extensionPoint) {
+        return extensionRegistry.getExtensionInfos(extensionPoint);
     }
 
     @Override
@@ -129,6 +149,17 @@ public class DefaultPluginContext implements PluginContext {
         return new PluginManagerView(pluginManager);
     }
 
+    @Override
+    public ThreadFactory getThreadFactory() {
+        String pluginId = descriptor.id();
+        return task -> {
+            Thread t = new Thread(threadGroup, task,
+                    pluginId + "-thread-" + threadCounter.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+        };
+    }
+
     /**
      * 事件订阅记录
      *
@@ -153,6 +184,11 @@ public class DefaultPluginContext implements PluginContext {
         @Override
         public void loadPlugins() {
             throw new PluginPermissionException("Plugin cannot invoke loadPlugins via PluginContext");
+        }
+
+        @Override
+        public List<PluginLoadError> loadPluginsWithResult() {
+            throw new PluginPermissionException("Plugin cannot invoke loadPluginsWithResult via PluginContext");
         }
 
         @Override
@@ -193,6 +229,26 @@ public class DefaultPluginContext implements PluginContext {
         @Override
         public void reloadPlugin(String pluginId, Path newJarPath) {
             throw new PluginPermissionException("Plugin cannot invoke reloadPlugin via PluginContext");
+        }
+
+        @Override
+        public void reloadPlugin(String pluginId) {
+            throw new PluginPermissionException("Plugin cannot invoke reloadPlugin via PluginContext");
+        }
+
+        @Override
+        public void installPlugin(Path source) {
+            throw new PluginPermissionException("Plugin cannot invoke installPlugin via PluginContext");
+        }
+
+        @Override
+        public void uninstallPlugin(String pluginId) {
+            throw new PluginPermissionException("Plugin cannot invoke uninstallPlugin via PluginContext");
+        }
+
+        @Override
+        public <T> List<ExtensionInfo> getExtensionInfos(Class<T> extensionPoint) {
+            return delegate.getExtensionInfos(extensionPoint);
         }
 
         @Override

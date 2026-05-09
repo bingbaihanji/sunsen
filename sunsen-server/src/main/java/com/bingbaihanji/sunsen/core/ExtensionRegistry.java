@@ -1,5 +1,6 @@
 package com.bingbaihanji.sunsen.core;
 
+import com.bingbaihanji.sunsen.api.ExtensionInfo;
 import com.bingbaihanji.sunsen.api.ExtensionRegistrar;
 import com.bingbaihanji.sunsen.api.PluginDescriptor;
 import com.bingbaihanji.sunsen.api.annotation.Extension;
@@ -23,8 +24,22 @@ public class ExtensionRegistry {
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     // 扩展点类型全名 -> 扩展条目列表(所有访问均由 lock 保护,无需 ConcurrentHashMap)
     private final Map<String, List<ExtensionEntry<?>>> entries = new HashMap<>();
+    // sole 扩展点被拒绝的候选列表(所有访问均由 lock 保护)
+    // key: 扩展点类型全名, value: 按 order 升序排列的被拒绝候选
+    private final Map<String, List<ExtensionEntry<?>>> rejectedSoleCandidates = new HashMap<>();
     // 扩展生命周期钩子,可为空
     private ExtensionRegistrar registrar;
+
+    /**
+     * 将条目按 order 升序插入列表
+     */
+    private static void insertSortedByOrder(List<ExtensionEntry<?>> list, ExtensionEntry<?> entry) {
+        int index = 0;
+        for (; index < list.size(); index++) {
+            if (list.get(index).order() > entry.order()) break;
+        }
+        list.add(index, entry);
+    }
 
     /**
      * 通过无参构造器创建扩展实例
@@ -73,11 +88,12 @@ public class ExtensionRegistry {
 
         String extensionId = ext.id().isBlank() ? implClass.getName() : ext.id();
         int order = ext.order();
+        String description = ext.description();
 
         ExtensionEntry<?> entry;
         if (ext.singleton()) {
             Object instance = createInstance(getConstructor(implClass));
-            entry = new ExtensionEntry<>(instance, extensionId, order, descriptor.id(), true, null, extensionPointType);
+            entry = new ExtensionEntry<>(instance, extensionId, order, description, descriptor.id(), true, null, extensionPointType);
             if (registrar != null) {
                 try {
                     registrar.afterExtensionCreated(instance, extensionPointType);
@@ -87,7 +103,7 @@ public class ExtensionRegistry {
                 }
             }
         } else {
-            entry = new ExtensionEntry<>(null, extensionId, order, descriptor.id(), false, getConstructor(implClass), extensionPointType);
+            entry = new ExtensionEntry<>(null, extensionId, order, description, descriptor.id(), false, getConstructor(implClass), extensionPointType);
         }
 
         ExtensionPoint ep = extensionPointType.getAnnotation(ExtensionPoint.class);
@@ -116,6 +132,8 @@ public class ExtensionRegistry {
                                         () -> "ExtensionRegistrar.afterExtensionDestroyed callback error: " + existing.extensionId(), ex);
                             }
                         }
+                        // 将被逐出的旧条目存入候选列表（按 order 升序）
+                        insertSortedByOrder(rejectedSoleCandidates.computeIfAbsent(key, k -> new ArrayList<>()), existing);
                         list.clear();
                     } else {
                         LOGGER.log(System.Logger.Level.WARNING,
@@ -131,6 +149,8 @@ public class ExtensionRegistry {
                                         () -> "ExtensionRegistrar.afterExtensionDestroyed callback error: " + entry.extensionId(), ex);
                             }
                         }
+                        // 将被拒绝的新条目存入候选列表（按 order 升序）
+                        insertSortedByOrder(rejectedSoleCandidates.computeIfAbsent(key, k -> new ArrayList<>()), entry);
                         return;
                     }
                 }
@@ -191,6 +211,29 @@ public class ExtensionRegistry {
     }
 
     /**
+     * 获取指定扩展点的元数据列表(不持有扩展实例引用)
+     */
+    public <T> List<ExtensionInfo> getExtensionInfos(Class<T> extensionPointType) {
+        lock.readLock().lock();
+        try {
+            List<ExtensionEntry<?>> list = entries.get(extensionPointType.getName());
+            if (list == null || list.isEmpty()) {
+                return List.of();
+            }
+            List<ExtensionInfo> result = new ArrayList<>(list.size());
+            for (ExtensionEntry<?> e : list) {
+                result.add(new ExtensionInfo(
+                        e.extensionId(), e.order(), e.description(),
+                        e.pluginId(), e.singleton(), e.extensionPointType()
+                ));
+            }
+            return Collections.unmodifiableList(result);
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    /**
      * 注销指定插件的所有扩展
      */
     public void unregisterPlugin(String pluginId) {
@@ -220,6 +263,34 @@ public class ExtensionRegistry {
             for (String key : emptyKeys) {
                 entries.remove(key);
             }
+
+            // 清理该插件在候选列表中的条目
+            rejectedSoleCandidates.values().forEach(list -> list.removeIf(e -> e.pluginId().equals(pluginId)));
+            rejectedSoleCandidates.entrySet().removeIf(e -> e.getValue().isEmpty());
+
+            // sole 幸存者恢复：对于因删除而变空的扩展点，若有候选则自动接管
+            for (String key : emptyKeys) {
+                List<ExtensionEntry<?>> candidates = rejectedSoleCandidates.get(key);
+                if (candidates != null && !candidates.isEmpty()) {
+                    ExtensionEntry<?> best = candidates.remove(0);
+                    if (candidates.isEmpty()) {
+                        rejectedSoleCandidates.remove(key);
+                    }
+                    entries.computeIfAbsent(key, k -> new ArrayList<>()).add(best);
+                    if (registrar != null && best.singleton()) {
+                        try {
+                            registrar.afterExtensionCreated(best.getInstance(), best.extensionPointType());
+                        } catch (Exception ex) {
+                            LOGGER.log(System.Logger.Level.ERROR,
+                                    () -> "ExtensionRegistrar.afterExtensionCreated callback error during sole survivor reinstatement: "
+                                            + best.extensionId(), ex);
+                        }
+                    }
+                    LOGGER.log(System.Logger.Level.INFO,
+                            () -> String.format("Sole extension point '%s': reinstated plugin '%s'(order=%d) after winner unloaded.",
+                                    key, best.pluginId(), best.order()));
+                }
+            }
         } finally {
             lock.writeLock().unlock();
         }
@@ -243,6 +314,7 @@ public class ExtensionRegistry {
      * @param cachedInstance     单例模式下的缓存实例
      * @param extensionId        扩展唯一标识
      * @param order              排序权重
+     * @param description        扩展描述文本
      * @param pluginId           所属插件 ID
      * @param singleton          是否为单例
      * @param constructor        无参构造器(非单例模式下使用)
@@ -251,6 +323,7 @@ public class ExtensionRegistry {
     record ExtensionEntry<T>(T cachedInstance,
                              String extensionId,
                              int order,
+                             String description,
                              String pluginId,
                              boolean singleton,
                              Constructor<?> constructor,
