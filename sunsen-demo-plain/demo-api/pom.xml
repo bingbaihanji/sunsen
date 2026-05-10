@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.bingbaihanji</groupId>
+        <artifactId>sunsen-demo-plain</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <!--
+        扩展点契约模块（Extension Point Contract）
+
+        职责：只放扩展点接口和跨插件共享的业务事件。
+        宿主和插件都依赖本模块，双方互不依赖对方，实现真正的解耦。
+
+        依赖关系：
+          宿主(demo-host)  ─┐
+                             ├──→ demo-api ──→ sunsen-api
+          插件(demo-plugins)─┘
+    -->
+    <artifactId>sunsen-demo-plain-api</artifactId>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <!--
+            sunsen-api 提供 @ExtensionPoint、@Extension 注解和 AbstractPluginEvent。
+            运行时由宿主 ClassLoader 提供，但在 demo-api 中声明 compile 作用域，
+            让 demo-host 和 demo-plugins 无需重复声明即可获得注解类。
+        -->
+        <dependency>
+            <groupId>com.bingbaihanji</groupId>
+            <artifactId>sunsen-core</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>

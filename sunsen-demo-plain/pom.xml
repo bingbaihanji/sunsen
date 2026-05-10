@@ -11,97 +11,18 @@
     </parent>
 
     <artifactId>sunsen-demo-plain</artifactId>
-    <packaging>jar</packaging>
+    <packaging>pom</packaging>
 
-    <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
-
-    <dependencies>
-        <dependency>
-            <groupId>com.bingbaihanji</groupId>
-            <artifactId>sunsen-server</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <!-- 宿主自身不需要 sunsen-api,但插件源码编译时需要其 .class -->
-        <dependency>
-            <groupId>com.bingbaihanji</groupId>
-            <artifactId>sunsen-api</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-    </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                    <execution>
-                        <id>package-plugins</id>
-                        <phase>prepare-package</phase>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
-                        <configuration>
-                            <target>
-                                <property name="core.classes" value="${project.basedir}/../sunsen-core/target/classes"/>
-                                <property name="api.classes" value="${project.basedir}/../sunsen-api/target/classes"/>
-                                <property name="demo.classes" value="${project.build.outputDirectory}"/>
-                                <property name="plugin.cp" value="${demo.classes};${core.classes};${api.classes}"/>
-                                <mkdir dir="${project.build.directory}/plugins"/>
-                                <!-- 编译 Hello 插件 -->
-                                <mkdir dir="${project.build.directory}/plugin-classes/hello"/>
-                                <javac srcdir="src/main/plugin-src/hello"
-                                       destdir="${project.build.directory}/plugin-classes/hello"
-                                       classpath="${plugin.cp}"
-                                       includeantruntime="false"/>
-                                <jar destfile="${project.build.directory}/plugins/plugin-hello.jar"
-                                     basedir="${project.build.directory}/plugin-classes/hello"/>
-                                <!-- 把 hello 插件的 config.properties 部署到工作目录(框架读取位置) -->
-                                <mkdir dir="${project.build.directory}/plugins/com.bingbaihanji.sunsen.demo.plain.hello"/>
-                                <copy file="src/main/plugin-src/hello/config.properties"
-                                      todir="${project.build.directory}/plugins/com.bingbaihanji.sunsen.demo.plain.hello"
-                                      failonerror="false"/>
-                                <!-- 编译 World 插件 -->
-                                <mkdir dir="${project.build.directory}/plugin-classes/world"/>
-                                <javac srcdir="src/main/plugin-src/world"
-                                       destdir="${project.build.directory}/plugin-classes/world"
-                                       classpath="${plugin.cp};${project.build.directory}/plugins/plugin-hello.jar"
-                                       includeantruntime="false"/>
-                                <jar destfile="${project.build.directory}/plugins/plugin-world.jar"
-                                     basedir="${project.build.directory}/plugin-classes/world"/>
-                                <!-- 编译 Scheduler 插件 -->
-                                <mkdir dir="${project.build.directory}/plugin-classes/scheduler"/>
-                                <javac srcdir="src/main/plugin-src/scheduler"
-                                       destdir="${project.build.directory}/plugin-classes/scheduler"
-                                       classpath="${plugin.cp}"
-                                       includeantruntime="false"/>
-                                <jar destfile="${project.build.directory}/plugins/plugin-scheduler.jar"
-                                     basedir="${project.build.directory}/plugin-classes/scheduler"/>
-                            </target>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.3.0</version>
-                <configuration>
-                    <mainClass>com.bingbaihanji.sunsen.demo.plain.PlainDemoApp</mainClass>
-                    <classpathScope>runtime</classpathScope>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
+    <!--
+        构建顺序：demo-api → demo-plugins → demo-host
+          - demo-api  : 扩展点契约接口，宿主和插件都依赖它
+          - demo-plugins : 三个演示插件（antrun 编译打包）
+          - demo-host : 宿主应用，通过 Maven exec 运行
+    -->
+    <modules>
+        <module>demo-api</module>
+        <module>demo-plugins</module>
+        <module>demo-host</module>
+    </modules>
 
 </project>

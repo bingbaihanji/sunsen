@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.bingbaihanji</groupId>
+        <artifactId>sunsen-demo-plain</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <!--
+        插件项目模块
+
+        本模块只产出三个插件 JAR，不生成常规 Maven artifact，故使用 pom 打包。
+        插件由 maven-antrun-plugin 在 prepare-package 阶段编译并打包，
+        输出到 target/plugins/，供 demo-host 在运行时加载。
+
+        插件源码与扩展点接口的依赖关系：
+          HelloPlugin     ──实现→ Greeter           (来自 demo-api)
+          WorldPlugin     ──实现→ Greeter           (来自 demo-api)
+          SchedulerPlugin ──实现→ GreetingFormatter (来自 demo-api)
+
+        所有插件只依赖 demo-api（扩展点契约），不依赖 demo-host。
+    -->
+    <artifactId>sunsen-demo-plain-plugins</artifactId>
+    <packaging>pom</packaging>
+    <dependencies>
+        <dependency>
+            <groupId>com.bingbaihanji</groupId>
+            <artifactId>sunsen-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.bingbaihanji</groupId>
+            <artifactId>sunsen-demo-plain-api</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>package-plugins</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <!--
+                                    编译期 classpath：
+                                      core.classes    → 框架核心（注解、接口）
+                                      api.classes     → sunsen-api（AbstractPlugin 等）
+                                      demo.api.classes → 扩展点契约（Greeter、GreetingFormatter、GreetingEvent）
+
+                                    插件源码只依赖 demo-api，不依赖 demo-host，
+                                    这正是三模块拆分要解决的核心问题。
+                                -->
+                                <property name="core.classes"
+                                          value="${project.basedir}/../../sunsen-core/target/classes"/>
+                                <property name="api.classes"
+                                          value="${project.basedir}/../../sunsen-api/target/classes"/>
+                                <property name="demo.api.classes"
+                                          value="${project.basedir}/../demo-api/target/classes"/>
+                                <property name="plugin.cp"
+                                          value="${demo.api.classes};${core.classes};${api.classes}"/>
+
+                                <mkdir dir="${project.build.directory}/plugins"/>
+
+                                <!--
+                                    三个插件共用 src/main/java 根目录（标准 Maven 规范），
+                                    用 includes 模式按包名隔离编译，各自产出独立 JAR。
+                                -->
+
+                                <!-- ── Hello 插件 ── -->
+                                <mkdir dir="${project.build.directory}/plugin-classes/hello"/>
+                                <javac srcdir="src/main/java"
+                                       includes="com/bingbaihanji/sunsen/demo/plain/hello/**"
+                                       destdir="${project.build.directory}/plugin-classes/hello"
+                                       classpath="${plugin.cp}"
+                                       includeantruntime="false"
+                                       release="21"/>
+                                <jar destfile="${project.build.directory}/plugins/plugin-hello.jar"
+                                     basedir="${project.build.directory}/plugin-classes/hello"/>
+                                <!-- Hello 插件配置文件：部署到框架约定的工作目录 -->
+                                <mkdir dir="${project.build.directory}/plugins/com.bingbaihanji.sunsen.demo.plain.hello"/>
+                                <copy file="src/main/resources/hello/config.properties"
+                                      todir="${project.build.directory}/plugins/com.bingbaihanji.sunsen.demo.plain.hello"
+                                      failonerror="false"/>
+
+                                <!-- ── World 插件（依赖 hello 插件的 ClassLoader，编译期仅需接口）── -->
+                                <mkdir dir="${project.build.directory}/plugin-classes/world"/>
+                                <javac srcdir="src/main/java"
+                                       includes="com/bingbaihanji/sunsen/demo/plain/world/**"
+                                       destdir="${project.build.directory}/plugin-classes/world"
+                                       classpath="${plugin.cp}"
+                                       includeantruntime="false"
+                                       release="21"/>
+                                <jar destfile="${project.build.directory}/plugins/plugin-world.jar"
+                                     basedir="${project.build.directory}/plugin-classes/world"/>
+
+                                <!-- ── Scheduler 插件 ── -->
+                                <mkdir dir="${project.build.directory}/plugin-classes/scheduler"/>
+                                <javac srcdir="src/main/java"
+                                       includes="com/bingbaihanji/sunsen/demo/plain/scheduler/**"
+                                       destdir="${project.build.directory}/plugin-classes/scheduler"
+                                       classpath="${plugin.cp}"
+                                       includeantruntime="false"
+                                       release="21"/>
+                                <jar destfile="${project.build.directory}/plugins/plugin-scheduler.jar"
+                                     basedir="${project.build.directory}/plugin-classes/scheduler"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

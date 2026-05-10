@@ -6,14 +6,39 @@
 
 ## 一、引入依赖
 
-### Maven
+### 推荐：三模块结构
 
-Sunsen 采用多模块结构:
+真实项目应将**扩展点接口单独抽成一个契约模块**（`{your-app}-api`），宿主和插件分别依赖它，互不依赖：
 
-**宿主应用**引入 `sunsen-server`(连带 `sunsen-core`):
+```
+{your-app}-api    ← 只放扩展点接口和跨插件事件
+       ↑                    ↑
+{your-app}-host   {your-app}-plugins
+（宿主业务逻辑）    （插件实现）
+```
+
+### Maven 各模块依赖配置
+
+**`{your-app}-api`（契约模块）**——只依赖 `sunsen-api` 获取注解：
 
 ```xml
+<dependency>
+    <groupId>com.bingbaihanji</groupId>
+    <artifactId>sunsen-api</artifactId>
+    <version>1.0-SNAPSHOT</version>
+</dependency>
+```
 
+**`{your-app}-host`（宿主应用）**——依赖契约模块 + 框架运行时：
+
+```xml
+<!-- 扩展点契约接口 -->
+<dependency>
+    <groupId>com.example</groupId>
+    <artifactId>{your-app}-api</artifactId>
+    <version>${project.version}</version>
+</dependency>
+<!-- 插件框架运行时（含 sunsen-core） -->
 <dependency>
     <groupId>com.bingbaihanji</groupId>
     <artifactId>sunsen-server</artifactId>
@@ -21,16 +46,29 @@ Sunsen 采用多模块结构:
 </dependency>
 ```
 
-**插件开发者**引入 `sunsen-api`(连带 `sunsen-core`):
+**`{your-app}-plugins`（插件）**——只依赖契约模块 + 插件开发工具包：
 
 ```xml
-
+<!-- 扩展点契约接口（provided：运行时由宿主 ClassLoader 提供） -->
+<dependency>
+    <groupId>com.example</groupId>
+    <artifactId>{your-app}-api</artifactId>
+    <version>${project.version}</version>
+    <scope>provided</scope>
+</dependency>
+<!-- 插件框架工具（provided：运行时由宿主 ClassLoader 提供） -->
 <dependency>
     <groupId>com.bingbaihanji</groupId>
     <artifactId>sunsen-api</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <scope>provided</scope>
 </dependency>
 ```
+
+> **为什么插件不能依赖宿主模块？**  
+> 宿主模块包含业务实现代码，插件依赖它会形成循环耦合，且宿主每次变更都会影响所有插件。
+> 将接口提取到独立的 `{app}-api` 模块后，宿主和插件共同依赖"契约"，插件开发者甚至不需要宿主源码，
+> 只需要这个轻量的接口包。参见 `sunsen-demo-plain/demo-api` 的完整示范。
 
 ### 最低环境要求
 
@@ -42,10 +80,11 @@ Sunsen 采用多模块结构:
 
 ### 2.1 定义扩展点
 
-扩展点是**宿主与插件之间的契约接口**,需标注 `@ExtensionPoint`:
+扩展点是**宿主与插件之间的契约接口**，应定义在独立的 `{app}-api` 模块中，并标注 `@ExtensionPoint`:
 
 ```java
-package com.example.app.ext;
+// 在 {your-app}-api 模块中定义，而非宿主业务模块
+package com.example.app.api;
 
 import com.bingbaihanji.sunsen.api.annotation.ExtensionPoint;
 
@@ -57,7 +96,8 @@ public interface Greeter {
 
 **关键规则**:
 
-- 扩展点接口必须位于**宿主 classpath**(或 sunsen-core 模块),确保所有插件通过父 ClassLoader 共享同一类型
+- 扩展点接口必须位于**宿主 classpath**（父 ClassLoader 可见），确保所有插件共享同一类型；推荐放在独立的 `{app}-api` 模块中
+- 扩展点接口**不能**出现在任何插件的 `packagePrefixes` 范围内，否则插件加载时会报前缀冲突错误
 - `id` 为空时,框架自动使用接口全限定名作为 key
 - `allowMultiple = false` 时,框架会校验**同一插件内**该扩展点的实现数量恰好为 1,否则拒绝加载;跨插件的多个实现仍允许
 - `sole = true` 时,框架确保**整个系统**中只有一个插件的实现被注册,冲突时保留 `order` 最小(优先级最高)的一个,并打印警告
@@ -303,7 +343,8 @@ public class HelloPlugin implements Plugin {
 package com.example.plugin.hello;
 
 import com.bingbaihanji.sunsen.api.annotation.Extension;
-import com.example.app.ext.Greeter;
+// 依赖 {your-app}-api 模块，而非宿主业务模块
+import com.example.app.api.Greeter;
 
 @Extension(order = 10, description = "英语问候")
 public class EnglishGreeter implements Greeter {
@@ -351,8 +392,8 @@ public class EnglishGreeter implements Greeter {
 
 **参考 Demo 的 antrun 打包方式**:
 
-`sunsen-demo-plain` 模块使用 `maven-antrun-plugin` 在 `prepare-package` 阶段将 `src/main/plugin-src/` 下的插件源码编译并打包为
-JAR,放入 `target/plugins/`。完整配置可参考 `sunsen-demo-plain/pom.xml`
+`demo-plugins` 子模块使用 `maven-antrun-plugin` 在 `prepare-package` 阶段将 `src/main/java/` 下的插件源码分别编译并打包为
+JAR，放入 `demo-plugins/target/plugins/`。各插件通过 `includes` 模式按包名隔离编译。完整配置可参考 `sunsen-demo-plain/demo-plugins/pom.xml`
 
 ---
 
@@ -491,19 +532,32 @@ public class SunsenConfig {
 
 ```
 sunsen/
-├── sunsen-core/               ← 零依赖公共契约
+├── sunsen-core/                       ← 零依赖公共契约
 │   └── src/main/java/...
-├── sunsen-api/                ← 插件开发模块
+├── sunsen-api/                        ← 插件开发工具包
 │   └── src/main/java/...
-├── sunsen-server/             ← 标准实现
+├── sunsen-server/                     ← 标准实现
 │   ├── src/main/java/...
-│   └── src/test/...           ← 集成测试 + 测试插件
-├── sunsen-demo-plain/         ← 纯 Java 演示
-│   ├── src/main/java/...      ← 宿主代码
-│   ├── src/main/plugin-src/   ← 内嵌插件源码(通过 antrun 打包)
-│   └── pom.xml                ← 包含插件编译打包配置
+│   └── src/test/...                   ← 集成测试 + 测试插件
+├── sunsen-demo-plain/                 ← 纯 Java 演示（聚合模块）
+│   ├── demo-api/                      ← ① 扩展点契约接口（推荐模式示范）
+│   │   └── src/main/java/...          ← Greeter / GreetingFormatter / GreetingEvent
+│   ├── demo-plugins/                  ← ② 三个演示插件
+│   │   └── src/main/java/com/.../     ← hello / world / scheduler
+│   └── demo-host/                     ← ③ 宿主应用
+│       └── src/main/java/...          ← PlainDemoApp
 └── pom.xml
 ```
+
+**三模块依赖关系**：
+
+```
+demo-host  ──依赖→  demo-api  ←──依赖──  demo-plugins
+demo-host  ──依赖→  sunsen-server
+demo-plugins ──依赖→ sunsen-api
+```
+
+宿主和插件**互不依赖**，共同依赖 `demo-api` 契约包。
 
 ### 运行测试
 
@@ -515,7 +569,7 @@ mvn test -pl sunsen-server
 
 ```bash
 mvn install
-mvn exec:java -pl sunsen-demo-plain
+mvn exec:java -pl sunsen-demo-plain/demo-host
 ```
 
 ---

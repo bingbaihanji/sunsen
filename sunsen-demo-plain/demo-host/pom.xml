@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.bingbaihanji</groupId>
+        <artifactId>sunsen-demo-plain</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <!--
+        宿主应用模块
+
+        依赖关系：
+          demo-host ──→ sunsen-demo-plain-api  （扩展点接口）
+          demo-host ──→ sunsen-server           （插件框架实现）
+
+        插件目录：demo-plugins/target/plugins/（由 demo-plugins 模块在构建时填充）
+
+        运行方式（先 mvn install 再执行）：
+          mvn exec:java -pl sunsen-demo-plain/demo-host
+    -->
+    <artifactId>sunsen-demo-plain-host</artifactId>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <!-- 扩展点契约：宿主通过接口使用扩展，不依赖任何插件实现 -->
+        <dependency>
+            <groupId>com.bingbaihanji</groupId>
+            <artifactId>sunsen-demo-plain-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- 插件框架运行时（含 sunsen-core） -->
+        <dependency>
+            <groupId>com.bingbaihanji</groupId>
+            <artifactId>sunsen-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.bingbaihanji</groupId>
+            <artifactId>sunsen-server</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <mainClass>com.bingbaihanji.sunsen.demo.plain.PlainDemoApp</mainClass>
+                    <!--
+                        工作目录设置为 sunsen-demo-plain/，使 PlainDemoApp 中的相对路径
+                        "demo-plugins/target/plugins" 能正确指向插件目录。
+                    -->
+                    <workingDirectory>${project.parent.basedir}</workingDirectory>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
