@@ -35,7 +35,7 @@ public @interface ExtensionPoint {
      * 与 {@link #allowMultiple()} 正交: allowMultiple 控制单个插件内的实现数量, sole 控制跨插件的全局唯一性.
      * <p>
      * 适用场景: 数据库驱动、认证后端等<strong>低频变更</strong>的基础设施选择.
-     * 被舍弃的实现会从 ExtensionRegistry 中移除;若竞争方后续卸载,已移除的实现不会自动恢复,需重新加载原插件.
+     * 被舍弃的实现保存在候选列表中;若当前优胜者所在插件卸载,优先级次高的候选会自动接管.
      */
     boolean sole() default false;
 }

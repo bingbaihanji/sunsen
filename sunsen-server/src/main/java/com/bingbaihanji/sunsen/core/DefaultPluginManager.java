@@ -674,6 +674,12 @@ public class DefaultPluginManager implements PluginManager {
             PluginEntry depEntry = plugins.get(dep.id());
             if (depEntry != null && depEntry.classLoader() != null) {
                 depLoaders.add(depEntry.classLoader());
+            } else if (!dep.optional()) {
+                PluginState depState = stateMachine.getState(dep.id());
+                String reason = depState == PluginState.FAILED
+                        ? "required dependency '" + dep.id() + "' failed to load"
+                        : "required dependency '" + dep.id() + "' is not loaded";
+                throw new PluginLoadException("Cannot load plugin '" + pluginId + "': " + reason);
             }
         }
 

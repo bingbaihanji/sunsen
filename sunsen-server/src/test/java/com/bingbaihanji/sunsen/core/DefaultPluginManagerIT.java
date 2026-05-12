@@ -115,8 +115,11 @@ public class DefaultPluginManagerIT {
         Files.deleteIfExists(pluginsDir.resolve("plugin-hello.jar"));
         Files.deleteIfExists(pluginsDir.resolve("plugin-world.jar"));
 
+        // Package to a separate staging dir so pluginsDir contains only the one renamed JAR
+        Path stagingDir = tempDir.resolve("fixtures-missing-dep");
+        Files.createDirectories(stagingDir);
         Path missingJar = TestPluginPackager.packagePlugin(
-                Path.of("src/test/resources/test-plugins/plugin-world-missing-dep"), pluginsDir);
+                Path.of("src/test/resources/test-plugins/plugin-world-missing-dep"), stagingDir);
         Files.copy(missingJar, pluginsDir.resolve("plugin-missing.jar"), StandardCopyOption.REPLACE_EXISTING);
 
         manager = new DefaultPluginManager();
@@ -130,9 +133,12 @@ public class DefaultPluginManagerIT {
         Files.deleteIfExists(pluginsDir.resolve("plugin-hello.jar"));
         Files.deleteIfExists(pluginsDir.resolve("plugin-world.jar"));
 
+        // Package to a separate staging dir so pluginsDir contains only the two renamed JARs
+        Path stagingDir = tempDir.resolve("fixtures-circular");
+        Files.createDirectories(stagingDir);
         Path srcDir = Path.of("src/test/resources/test-plugins");
-        Path aJar = TestPluginPackager.packagePlugin(srcDir.resolve("plugin-a-circular"), pluginsDir);
-        Path bJar = TestPluginPackager.packagePlugin(srcDir.resolve("plugin-b-circular"), pluginsDir);
+        Path aJar = TestPluginPackager.packagePlugin(srcDir.resolve("plugin-a-circular"), stagingDir);
+        Path bJar = TestPluginPackager.packagePlugin(srcDir.resolve("plugin-b-circular"), stagingDir);
         Files.copy(aJar, pluginsDir.resolve("plugin-a.jar"), StandardCopyOption.REPLACE_EXISTING);
         Files.copy(bJar, pluginsDir.resolve("plugin-b.jar"), StandardCopyOption.REPLACE_EXISTING);
 

@@ -172,8 +172,10 @@ public class DefaultPluginContext implements PluginContext {
     /**
      * PluginManager 的安全视图,限制插件只能执行查询操作,
      * 禁止直接加载/卸载/启动/停止/热重载其他插件.
+     * 事件发布与订阅路由到外层 {@link DefaultPluginContext},
+     * 以保证 sourcePluginId 校验和自动取消订阅语义.
      */
-    private static class PluginManagerView implements PluginManager {
+    private class PluginManagerView implements PluginManager {
 
         private final PluginManager delegate;
 
@@ -278,17 +280,19 @@ public class DefaultPluginContext implements PluginContext {
 
         @Override
         public void publishEvent(PluginEvent event) {
-            delegate.publishEvent(event);
+            // Route through context to enforce sourcePluginId == descriptor.id()
+            DefaultPluginContext.this.publishEvent(event);
         }
 
         @Override
         public <T extends PluginEvent> void subscribe(Class<T> eventType, PluginEventListener<T> listener) {
-            delegate.subscribe(eventType, listener);
+            // Route through context so the subscription is tracked and auto-cleaned on unload
+            DefaultPluginContext.this.subscribe(eventType, listener);
         }
 
         @Override
         public <T extends PluginEvent> void unsubscribe(Class<T> eventType, PluginEventListener<T> listener) {
-            delegate.unsubscribe(eventType, listener);
+            DefaultPluginContext.this.unsubscribe(eventType, listener);
         }
 
         @Override
