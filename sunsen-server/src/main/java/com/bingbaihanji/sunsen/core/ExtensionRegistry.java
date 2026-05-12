@@ -101,8 +101,8 @@ public class ExtensionRegistry {
                 try {
                     registrar.afterExtensionCreated(instance, extensionPointType);
                 } catch (Exception e) {
-                    LOGGER.log(System.Logger.Level.ERROR,
-                            () -> "ExtensionRegistrar.afterExtensionCreated 回调异常: " + implClass.getName(), e);
+                    throw new RuntimeException(
+                            "ExtensionRegistrar.afterExtensionCreated failed for " + implClass.getName(), e);
                 }
             }
         } else {

@@ -111,12 +111,12 @@ public class ExtensionScanner {
             List<Class<?>> extensionPointTypes;
             try {
                 extensionPointTypes = inferExtensionPointTypes(implClass);
-            } catch (NoClassDefFoundError e) {
-                // A supertype of the extension class has a missing transitive dependency.
+            } catch (LinkageError e) {
+                // A supertype of the extension class has a missing or incompatible transitive dependency.
                 // Log and skip rather than crashing the whole scan.
                 LOGGER.log(System.Logger.Level.WARNING,
                         () -> "Skipping extension class " + implClass.getName() + " in plugin "
-                                + descriptor.id() + ": missing transitive dependency during type inference: "
+                                + descriptor.id() + ": linkage error during type inference: "
                                 + e.getMessage());
                 continue;
             }

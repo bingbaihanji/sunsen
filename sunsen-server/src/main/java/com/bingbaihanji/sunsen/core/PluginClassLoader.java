@@ -124,8 +124,10 @@ public class PluginClassLoader extends URLClassLoader {
                         resolveClass(c);
                     }
                     return c;
-                } catch (ClassNotFoundException ignored) {
-                    // 继续下一步
+                } catch (ClassNotFoundException e) {
+                    // 明确属于本插件前缀但找不到 → 立即失败,
+                    // 防止穿透到父 ClassLoader 破坏隔离语义
+                    throw e;
                 }
             }
 
