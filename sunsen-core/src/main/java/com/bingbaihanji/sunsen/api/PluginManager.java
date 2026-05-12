@@ -10,7 +10,7 @@ import java.util.Optional;
 /**
  * 插件管理器接口
  */
-public interface PluginManager {
+public interface PluginManager extends AutoCloseable {
 
     //   批量操作
 
@@ -197,7 +197,7 @@ public interface PluginManager {
     <T extends PluginEvent> void unsubscribe(
             Class<T> eventType, PluginEventListener<T> listener);
 
-    //   钩子配置  
+    //   钩子配置
 
     /**
      * 设置扩展实例生命周期钩子(HOOK)
@@ -205,4 +205,19 @@ public interface PluginManager {
      * @param registrar 扩展注册器实现
      */
     void setExtensionRegistrar(ExtensionRegistrar registrar);
+
+    /**
+     * 停止并卸载所有插件,释放所有资源.
+     * <p>
+     * 等价于依次调用 {@link #stopPlugins()} 和 {@link #unloadPlugins()}.
+     * 实现 {@link AutoCloseable} 使管理器可用于 try-with-resources 块.
+     */
+    @Override
+    default void close() {
+        try {
+            stopPlugins();
+        } finally {
+            unloadPlugins();
+        }
+    }
 }

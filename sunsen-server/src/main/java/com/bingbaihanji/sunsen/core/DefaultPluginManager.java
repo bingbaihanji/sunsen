@@ -272,6 +272,7 @@ public class DefaultPluginManager implements PluginManager {
                 }
                 unloadSinglePlugin(pluginId);
             }
+            topology.clear();
         } finally {
             managementLock.unlock();
         }
@@ -287,15 +288,20 @@ public class DefaultPluginManager implements PluginManager {
         PluginClassLoader.validatePrefixes(allDescriptors);
         dependencyResolver.resolve(allDescriptors);
 
-        stateMachine.init(descriptor.id(), PluginState.CREATED);
-
         managementLock.lock();
         try {
             // Double-check inside lock to avoid TOCTOU race
             if (plugins.containsKey(descriptor.id())) {
                 throw new PluginLoadException("Plugin already exists: " + descriptor.id());
             }
-            loadSinglePlugin(descriptor, jarPath);
+            // Init state machine inside lock so a failed check never leaves orphaned state
+            stateMachine.init(descriptor.id(), PluginState.CREATED);
+            try {
+                loadSinglePlugin(descriptor, jarPath);
+            } catch (Exception e) {
+                stateMachine.remove(descriptor.id());
+                throw e;
+            }
             rebuildTopology();
             return descriptor;
         } finally {
@@ -450,15 +456,18 @@ public class DefaultPluginManager implements PluginManager {
                 }
             }
 
-            // Phase 5: start new plugin
-            startSinglePlugin(pluginId);
-            rebuildTopology();
-
-            // Phase 6: publish events outside registry write lock to avoid dead lock
+            // Phase 5: publish lifecycle events outside registry write lock to avoid deadlock.
+            // Order must match normal load: Unloaded(old) → Loaded(new) → Started(new) → Reloaded.
             if (oldDescriptor != null) {
                 eventBus.publish(new PluginUnloadedEvent(oldDescriptor));
             }
             eventBus.publish(new PluginLoadedEvent(newDescriptor));
+
+            // Phase 6: start new plugin (publishes PluginStartedEvent)
+            startSinglePlugin(pluginId);
+            rebuildTopology();
+
+            // Phase 7: signal reload complete
             eventBus.publish(new PluginReloadedEvent(oldDescriptor, newDescriptor));
         } finally {
             managementLock.unlock();
