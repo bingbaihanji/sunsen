@@ -25,54 +25,10 @@ class ExtensionRegistryTest {
 
     // ---- 测试用扩展点和扩展类 ----
 
-    @ExtensionPoint
-    interface Greeter {
-        String greet();
-    }
-
-    @Extension(id = "hello", order = 10)
-    static class HelloGreeter implements Greeter {
-        @Override public String greet() { return "hello"; }
-    }
-
-    @Extension(id = "world", order = 20)
-    static class WorldGreeter implements Greeter {
-        @Override public String greet() { return "world"; }
-    }
-
-    @Extension(id = "hi", order = 5)
-    static class HiGreeter implements Greeter {
-        @Override public String greet() { return "hi"; }
-    }
-
-    @Extension(id = "proto", singleton = false, order = 0)
-    static class ProtoGreeter implements Greeter {
-        @Override public String greet() { return "proto"; }
-    }
-
-    @ExtensionPoint(sole = true)
-    interface Backend {
-        String name();
-    }
-
-    @Extension(id = "backend-a", order = 10)
-    static class BackendA implements Backend {
-        @Override public String name() { return "A"; }
-    }
-
-    @Extension(id = "backend-b", order = 20)
-    static class BackendB implements Backend {
-        @Override public String name() { return "B"; }
-    }
-
-    // ---- 辅助方法 ----
-
     private PluginDescriptor descriptor(String id) {
         return new PluginDescriptor(id, id, "", "1.0.0", "1.0", "Main",
                 List.of("com.test." + id), List.of(), Set.of(), Map.of());
     }
-
-    // ---- 基础注册 ----
 
     @Test
     void testEmptyRegistryReturnsEmptyList() {
@@ -88,7 +44,7 @@ class ExtensionRegistryTest {
 
         List<Greeter> greeters = registry.getExtensions(Greeter.class);
         assertEquals(3, greeters.size());
-        assertEquals("hi",    greeters.get(0).greet()); // order 5
+        assertEquals("hi", greeters.get(0).greet()); // order 5
         assertEquals("hello", greeters.get(1).greet()); // order 10
         assertEquals("world", greeters.get(2).greet()); // order 20
     }
@@ -106,8 +62,6 @@ class ExtensionRegistryTest {
         assertTrue(registry.getExtension(Greeter.class, "missing").isEmpty());
     }
 
-    // ---- 单例 vs 原型 ----
-
     @Test
     void testSingletonReturnsSameInstance() {
         registry.register(descriptor("plugin-a"), HelloGreeter.class, Greeter.class);
@@ -124,8 +78,6 @@ class ExtensionRegistryTest {
         assertNotSame(g1, g2);
         assertEquals("proto", g1.greet());
     }
-
-    // ---- 注销 ----
 
     @Test
     void testUnregisterRemovesAllExtensionsOfPlugin() {
@@ -150,7 +102,7 @@ class ExtensionRegistryTest {
         assertEquals("world", remaining.get(0).greet());
     }
 
-    // ---- sole 扩展点 ----
+    // ---- 辅助方法 ----
 
     @Test
     void testSoleLowerOrderWins() {
@@ -162,6 +114,8 @@ class ExtensionRegistryTest {
         assertEquals(1, backends.size());
         assertEquals("A", backends.get(0).name());
     }
+
+    // ---- 基础注册 ----
 
     @Test
     void testSoleHigherPriorityWinsWhenRegisteredSecond() {
@@ -198,7 +152,7 @@ class ExtensionRegistryTest {
         assertTrue(registry.getExtensions(Backend.class).isEmpty());
     }
 
-    // ---- 元数据 ----
+    // ---- 单例 vs 原型 ----
 
     @Test
     void testGetExtensionInfos() {
@@ -218,7 +172,7 @@ class ExtensionRegistryTest {
         assertTrue(registry.getExtensionInfos(Greeter.class).isEmpty());
     }
 
-    // ---- withWriteLock ----
+    // ---- 注销 ----
 
     @Test
     void testWithWriteLockExecutesAction() {
@@ -227,15 +181,82 @@ class ExtensionRegistryTest {
         assertEquals(1, registry.getExtensions(Greeter.class).size());
     }
 
-    // ---- @Extension 未标注时应抛出 ----
-
-    static class NotAnnotated implements Greeter {
-        @Override public String greet() { return ""; }
-    }
-
     @Test
     void testRegisterWithoutExtensionAnnotationThrows() {
         assertThrows(IllegalArgumentException.class,
                 () -> registry.register(descriptor("plugin-a"), NotAnnotated.class, Greeter.class));
+    }
+
+    // ---- sole 扩展点 ----
+
+    @ExtensionPoint
+    interface Greeter {
+        String greet();
+    }
+
+    @ExtensionPoint(sole = true)
+    interface Backend {
+        String name();
+    }
+
+    @Extension(id = "hello", order = 10)
+    static class HelloGreeter implements Greeter {
+        @Override
+        public String greet() {
+            return "hello";
+        }
+    }
+
+    @Extension(id = "world", order = 20)
+    static class WorldGreeter implements Greeter {
+        @Override
+        public String greet() {
+            return "world";
+        }
+    }
+
+    // ---- 元数据 ----
+
+    @Extension(id = "hi", order = 5)
+    static class HiGreeter implements Greeter {
+        @Override
+        public String greet() {
+            return "hi";
+        }
+    }
+
+    @Extension(id = "proto", singleton = false, order = 0)
+    static class ProtoGreeter implements Greeter {
+        @Override
+        public String greet() {
+            return "proto";
+        }
+    }
+
+    // ---- withWriteLock ----
+
+    @Extension(id = "backend-a", order = 10)
+    static class BackendA implements Backend {
+        @Override
+        public String name() {
+            return "A";
+        }
+    }
+
+    // ---- @Extension 未标注时应抛出 ----
+
+    @Extension(id = "backend-b", order = 20)
+    static class BackendB implements Backend {
+        @Override
+        public String name() {
+            return "B";
+        }
+    }
+
+    static class NotAnnotated implements Greeter {
+        @Override
+        public String greet() {
+            return "";
+        }
     }
 }

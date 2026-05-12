@@ -257,7 +257,8 @@ public class ExtensionRegistry {
      */
     public void unregisterPlugin(String pluginId) {
         // Callbacks to invoke after the lock is released
-        record PendingCallback(Object instance, Class<?> epType, boolean create) {}
+        record PendingCallback(Object instance, Class<?> epType, boolean create) {
+        }
         List<PendingCallback> pending = new ArrayList<>();
 
         lock.writeLock().lock();

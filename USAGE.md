@@ -393,7 +393,8 @@ public class EnglishGreeter implements Greeter {
 **参考 Demo 的 antrun 打包方式**:
 
 `demo-plugins` 子模块使用 `maven-antrun-plugin` 在 `prepare-package` 阶段将 `src/main/java/` 下的插件源码分别编译并打包为
-JAR，放入 `demo-plugins/target/plugins/`。各插件通过 `includes` 模式按包名隔离编译。完整配置可参考 `sunsen-demo-plain/demo-plugins/pom.xml`
+JAR，放入 `demo-plugins/target/plugins/`。各插件通过 `includes` 模式按包名隔离编译。完整配置可参考
+`sunsen-demo-plain/demo-plugins/pom.xml`
 
 ---
 

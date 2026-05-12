@@ -43,18 +43,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  */
 public class PlainDemoApp {
 
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
-    private Path resolvePluginsDir() {
-        // exec-maven-plugin 将工作目录设置为 sunsen-demo-plain/，
-        // 所以 "demo-plugins/target/plugins" 是首选路径。
-        Path dir = Path.of("demo-plugins/target/plugins");
-        if (!Files.exists(dir)) {
-            dir = Path.of("D:\\bingbaihanji\\Sunsen\\sunsen-demo-plain\\demo-plugins\\target\\plugins");
-        }
-        return dir.toAbsolutePath().normalize();
-    }
-
     final Runnable task = () -> {
         Path pluginsDir = resolvePluginsDir();
 
@@ -146,14 +134,25 @@ public class PlainDemoApp {
             throw new RuntimeException(e);
         }
     };
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+    public static void main(String[] args) {
+        new PlainDemoApp().loop();
+    }
+
+    private Path resolvePluginsDir() {
+        // exec-maven-plugin 将工作目录设置为 sunsen-demo-plain/，
+        // 所以 "demo-plugins/target/plugins" 是首选路径。
+        Path dir = Path.of("demo-plugins/target/plugins");
+        if (!Files.exists(dir)) {
+            dir = Path.of("D:\\bingbaihanji\\Sunsen\\sunsen-demo-plain\\demo-plugins\\target\\plugins");
+        }
+        return dir.toAbsolutePath().normalize();
+    }
 
     private void loop() {
         ScheduledFuture<?> handle = scheduler.scheduleAtFixedRate(task, 5, 20, SECONDS);
         Runnable canceller = () -> handle.cancel(false);
         scheduler.schedule(canceller, 1, HOURS);
-    }
-
-    public static void main(String[] args) {
-        new PlainDemoApp().loop();
     }
 }

@@ -6,12 +6,8 @@ import com.bingbaihanji.sunsen.api.PluginState;
 
 import java.io.IOException;
 import java.nio.file.*;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 /**
  * 插件目录文件监听器.
@@ -45,7 +41,9 @@ import java.util.concurrent.TimeUnit;
  */
 public class PluginWatcher implements AutoCloseable {
 
-    /** 文件写入稳定性等待时间(毫秒),防止 JAR 写入过程中触发热重载 */
+    /**
+     * 文件写入稳定性等待时间(毫秒),防止 JAR 写入过程中触发热重载
+     */
     private static final long STABILIZE_DELAY_MS = 500;
 
     private static final System.Logger LOGGER = System.getLogger(PluginWatcher.class.getName());
@@ -147,7 +145,9 @@ public class PluginWatcher implements AutoCloseable {
         }
     }
 
-    /** 将超过防抖窗口的待处理变更触发实际操作 */
+    /**
+     * 将超过防抖窗口的待处理变更触发实际操作
+     */
     private void flushPending() {
         long now = System.currentTimeMillis();
         pendingModify.entrySet().removeIf(entry -> {

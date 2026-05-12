@@ -109,7 +109,9 @@ class LifecycleStateMachineTest {
         machine.init("p1", PluginState.LOADED);
         RuntimeException cause = new RuntimeException("boom");
         RuntimeException thrown = assertThrows(RuntimeException.class,
-                () -> machine.executePhase(() -> { throw cause; }, descriptor("p1"), PluginState.LOADED));
+                () -> machine.executePhase(() -> {
+                    throw cause;
+                }, descriptor("p1"), PluginState.LOADED));
         assertSame(cause, thrown);
         assertEquals(PluginState.FAILED, machine.getState("p1"));
         assertEquals(1, capturedFailedEvents.size());

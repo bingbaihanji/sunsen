@@ -85,19 +85,19 @@ public class DefaultPluginManager implements PluginManager {
     }
 
     /**
+     * 获取插件根目录
+     */
+    public Path getPluginsDir() {
+        return pluginsDir;
+    }
+
+    /**
      * 设置插件根目录
      *
      * @param pluginsDir 插件目录路径
      */
     public void setPluginsDir(Path pluginsDir) {
         this.pluginsDir = pluginsDir;
-    }
-
-    /**
-     * 获取插件根目录
-     */
-    public Path getPluginsDir() {
-        return pluginsDir;
     }
 
 
@@ -492,7 +492,7 @@ public class DefaultPluginManager implements PluginManager {
             if (finalState != PluginState.ACTIVE) {
                 throw new PluginLoadException(
                         "Plugin reload completed but new version failed to start: " + pluginId
-                        + " (state=" + finalState + ")");
+                                + " (state=" + finalState + ")");
             }
             eventBus.publish(new PluginReloadedEvent(oldDescriptor, newDescriptor));
         } finally {

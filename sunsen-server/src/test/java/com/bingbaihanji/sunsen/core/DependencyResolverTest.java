@@ -71,9 +71,9 @@ class DependencyResolverTest {
     @Test
     void testDiamondDependencyOrder() {
         PluginDescriptor base = plugin("base", "1.0.0");
-        PluginDescriptor left = plugin("left",  "1.0.0", dep("base", "1.0.0"));
+        PluginDescriptor left = plugin("left", "1.0.0", dep("base", "1.0.0"));
         PluginDescriptor right = plugin("right", "1.0.0", dep("base", "1.0.0"));
-        PluginDescriptor top  = plugin("top",  "1.0.0", dep("left", "1.0.0"), dep("right", "1.0.0"));
+        PluginDescriptor top = plugin("top", "1.0.0", dep("left", "1.0.0"), dep("right", "1.0.0"));
 
         resolver.resolve(List.of(base, left, right, top));
         List<PluginDescriptor> sorted = resolver.sort(List.of(base, left, right, top));
