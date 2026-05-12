@@ -173,8 +173,16 @@ public class DefaultPluginManager implements PluginManager {
             return errors;
         }
 
-        PluginClassLoader.validatePrefixes(descriptors);
-        dependencyResolver.resolve(descriptors);
+        try {
+            PluginClassLoader.validatePrefixes(descriptors);
+            dependencyResolver.resolve(descriptors);
+        } catch (Exception e) {
+            // Clean up state machine entries created in the parse loop above
+            for (PluginDescriptor d : descriptors) {
+                stateMachine.remove(d.id());
+            }
+            throw e;
+        }
         List<List<PluginDescriptor>> waves = dependencyResolver.sortByLevels(descriptors);
 
         for (List<PluginDescriptor> wave : waves) {
@@ -421,9 +429,18 @@ public class DefaultPluginManager implements PluginManager {
                             loadSinglePluginCore(oldDescriptor, oldJarPath);
                         });
                         startSinglePlugin(pluginId);
-                        rolledBack = true;
-                        LOGGER.log(System.Logger.Level.INFO,
-                                () -> "Plugin " + pluginId + " successfully rolled back to " + oldJarPath);
+                        // Only declare rollback successful when the old version actually reached ACTIVE.
+                        // startSinglePlugin swallows start exceptions silently.
+                        if (stateMachine.getState(pluginId) == PluginState.ACTIVE) {
+                            rolledBack = true;
+                            LOGGER.log(System.Logger.Level.INFO,
+                                    () -> "Plugin " + pluginId + " successfully rolled back to " + oldJarPath);
+                        } else {
+                            LOGGER.log(System.Logger.Level.ERROR,
+                                    () -> "Rollback of plugin " + pluginId
+                                            + " loaded but failed to start (state="
+                                            + stateMachine.getState(pluginId) + ")");
+                        }
                     } catch (Exception rollbackEx) {
                         LOGGER.log(System.Logger.Level.ERROR,
                                 () -> "Rollback failed for plugin " + pluginId, rollbackEx);
@@ -467,7 +484,16 @@ public class DefaultPluginManager implements PluginManager {
             startSinglePlugin(pluginId);
             rebuildTopology();
 
-            // Phase 7: signal reload complete
+            // Phase 7: signal reload complete — only when plugin actually reached ACTIVE.
+            // startSinglePlugin swallows exceptions but transitions the plugin to FAILED and
+            // publishes PluginFailedEvent; propagating a PluginLoadException here ensures the
+            // caller is not misled into thinking the reload fully succeeded.
+            PluginState finalState = stateMachine.getState(pluginId);
+            if (finalState != PluginState.ACTIVE) {
+                throw new PluginLoadException(
+                        "Plugin reload completed but new version failed to start: " + pluginId
+                        + " (state=" + finalState + ")");
+            }
             eventBus.publish(new PluginReloadedEvent(oldDescriptor, newDescriptor));
         } finally {
             managementLock.unlock();

@@ -6,6 +6,7 @@ import com.bingbaihanji.sunsen.api.PluginState;
 
 import java.io.IOException;
 import java.nio.file.*;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -152,7 +153,11 @@ public class PluginWatcher implements AutoCloseable {
         pendingModify.entrySet().removeIf(entry -> {
             if (now - entry.getValue() >= STABILIZE_DELAY_MS) {
                 Path jar = entry.getKey();
-                debounceExecutor.submit(() -> handleCreateOrModify(jar));
+                try {
+                    debounceExecutor.submit(() -> handleCreateOrModify(jar));
+                } catch (RejectedExecutionException ignored) {
+                    // Executor is shutting down (close() called); skip remaining events
+                }
                 return true;
             }
             return false;

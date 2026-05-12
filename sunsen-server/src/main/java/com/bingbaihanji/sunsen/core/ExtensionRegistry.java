@@ -90,6 +90,9 @@ public class ExtensionRegistry {
         int order = ext.order();
         String description = ext.description();
 
+        // afterExtensionCreated is called here, outside any lock, for the winning entry.
+        // If this entry later loses a sole-point conflict, afterExtensionDestroyed is
+        // scheduled below (also outside the lock) to keep the lock window minimal.
         ExtensionEntry<?> entry;
         if (ext.singleton()) {
             Object instance = createInstance(getConstructor(implClass));
@@ -109,6 +112,12 @@ public class ExtensionRegistry {
         ExtensionPoint ep = extensionPointType.getAnnotation(ExtensionPoint.class);
         boolean isSole = ep != null && ep.sole();
 
+        // Deferred destroy callback: collected inside the lock, invoked outside to avoid
+        // holding the write lock during external (potentially slow or re-entrant) calls.
+        Object pendingDestroyInstance = null;
+        Class<?> pendingDestroyType = null;
+        boolean registered = true;
+
         lock.writeLock().lock();
         try {
             String key = extensionPointType.getName();
@@ -124,13 +133,10 @@ public class ExtensionRegistry {
                                                 "plugin '%s'(order=%d) and plugin '%s'(order=%d). Keeping '%s' with higher priority.",
                                         key, existing.pluginId(), existing.order(),
                                         descriptor.id(), order, descriptor.id()));
+                        // Schedule destroy callback for displaced existing entry (invoked after lock release)
                         if (registrar != null && existing.singleton()) {
-                            try {
-                                registrar.afterExtensionDestroyed(existing.getInstance(), extensionPointType);
-                            } catch (Exception ex) {
-                                LOGGER.log(System.Logger.Level.ERROR,
-                                        () -> "ExtensionRegistrar.afterExtensionDestroyed callback error: " + existing.extensionId(), ex);
-                            }
+                            pendingDestroyInstance = existing.getInstance();
+                            pendingDestroyType = extensionPointType;
                         }
                         // 将被逐出的旧条目存入候选列表（按 order 升序）
                         insertSortedByOrder(rejectedSoleCandidates.computeIfAbsent(key, k -> new ArrayList<>()), existing);
@@ -141,31 +147,41 @@ public class ExtensionRegistry {
                                                 "plugin '%s'(order=%d) and plugin '%s'(order=%d). Keeping '%s' with higher priority.",
                                         key, existing.pluginId(), existing.order(),
                                         descriptor.id(), order, existing.pluginId()));
+                        // New entry loses: schedule destroy callback for it (invoked after lock release)
                         if (registrar != null && entry.singleton()) {
-                            try {
-                                registrar.afterExtensionDestroyed(entry.getInstance(), extensionPointType);
-                            } catch (Exception ex) {
-                                LOGGER.log(System.Logger.Level.ERROR,
-                                        () -> "ExtensionRegistrar.afterExtensionDestroyed callback error: " + entry.extensionId(), ex);
-                            }
+                            pendingDestroyInstance = entry.getInstance();
+                            pendingDestroyType = extensionPointType;
                         }
                         // 将被拒绝的新条目存入候选列表（按 order 升序）
                         insertSortedByOrder(rejectedSoleCandidates.computeIfAbsent(key, k -> new ArrayList<>()), entry);
-                        return;
+                        registered = false;
                     }
                 }
             }
 
-            // 按 order 升序插入
-            int index = 0;
-            for (; index < list.size(); index++) {
-                if (list.get(index).order() > order) {
-                    break;
+            if (registered) {
+                // 按 order 升序插入
+                int index = 0;
+                for (; index < list.size(); index++) {
+                    if (list.get(index).order() > order) {
+                        break;
+                    }
                 }
+                list.add(index, entry);
             }
-            list.add(index, entry);
         } finally {
             lock.writeLock().unlock();
+        }
+
+        // Invoke deferred destroy callback outside the write lock
+        if (pendingDestroyInstance != null) {
+            try {
+                registrar.afterExtensionDestroyed(pendingDestroyInstance, pendingDestroyType);
+            } catch (Exception ex) {
+                final Object inst = pendingDestroyInstance;
+                LOGGER.log(System.Logger.Level.ERROR,
+                        () -> "ExtensionRegistrar.afterExtensionDestroyed callback error: " + inst.getClass().getName(), ex);
+            }
         }
     }
 
@@ -234,9 +250,16 @@ public class ExtensionRegistry {
     }
 
     /**
-     * 注销指定插件的所有扩展
+     * 注销指定插件的所有扩展.
+     * <p>
+     * 所有注册表变更在写锁内完成；{@link ExtensionRegistrar} 回调在锁释放后统一触发，
+     * 避免外部代码持有写锁期间再次调用 {@code getExtensions}（读锁）造成长时间阻塞或死锁。
      */
     public void unregisterPlugin(String pluginId) {
+        // Callbacks to invoke after the lock is released
+        record PendingCallback(Object instance, Class<?> epType, boolean create) {}
+        List<PendingCallback> pending = new ArrayList<>();
+
         lock.writeLock().lock();
         try {
             List<String> emptyKeys = new ArrayList<>();
@@ -245,12 +268,7 @@ public class ExtensionRegistry {
                 list.removeIf(e -> {
                     if (e.pluginId().equals(pluginId)) {
                         if (registrar != null && e.singleton()) {
-                            try {
-                                registrar.afterExtensionDestroyed(e.getInstance(), e.extensionPointType());
-                            } catch (Exception ex) {
-                                LOGGER.log(System.Logger.Level.ERROR,
-                                        () -> "ExtensionRegistrar.afterExtensionDestroyed callback error: " + e.extensionId(), ex);
-                            }
+                            pending.add(new PendingCallback(e.getInstance(), e.extensionPointType(), false));
                         }
                         return true;
                     }
@@ -278,13 +296,7 @@ public class ExtensionRegistry {
                     }
                     entries.computeIfAbsent(key, k -> new ArrayList<>()).add(best);
                     if (registrar != null && best.singleton()) {
-                        try {
-                            registrar.afterExtensionCreated(best.getInstance(), best.extensionPointType());
-                        } catch (Exception ex) {
-                            LOGGER.log(System.Logger.Level.ERROR,
-                                    () -> "ExtensionRegistrar.afterExtensionCreated callback error during sole survivor reinstatement: "
-                                            + best.extensionId(), ex);
-                        }
+                        pending.add(new PendingCallback(best.getInstance(), best.extensionPointType(), true));
                     }
                     LOGGER.log(System.Logger.Level.INFO,
                             () -> String.format("Sole extension point '%s': reinstated plugin '%s'(order=%d) after winner unloaded.",
@@ -293,6 +305,20 @@ public class ExtensionRegistry {
             }
         } finally {
             lock.writeLock().unlock();
+        }
+
+        // Invoke callbacks outside the write lock
+        for (PendingCallback cb : pending) {
+            try {
+                if (cb.create()) {
+                    registrar.afterExtensionCreated(cb.instance(), cb.epType());
+                } else {
+                    registrar.afterExtensionDestroyed(cb.instance(), cb.epType());
+                }
+            } catch (Exception ex) {
+                LOGGER.log(System.Logger.Level.ERROR,
+                        () -> "ExtensionRegistrar callback error for " + cb.instance().getClass().getName(), ex);
+            }
         }
     }
 

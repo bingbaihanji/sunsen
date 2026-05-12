@@ -108,7 +108,18 @@ public class ExtensionScanner {
         Map<Class<?>, List<Class<?>>> implToEpTypes = new LinkedHashMap<>(extensionClasses.size() * 2);
         Map<Class<?>, List<Class<?>>> byExtensionPoint = new LinkedHashMap<>();
         for (Class<?> implClass : extensionClasses) {
-            List<Class<?>> extensionPointTypes = inferExtensionPointTypes(implClass);
+            List<Class<?>> extensionPointTypes;
+            try {
+                extensionPointTypes = inferExtensionPointTypes(implClass);
+            } catch (NoClassDefFoundError e) {
+                // A supertype of the extension class has a missing transitive dependency.
+                // Log and skip rather than crashing the whole scan.
+                LOGGER.log(System.Logger.Level.WARNING,
+                        () -> "Skipping extension class " + implClass.getName() + " in plugin "
+                                + descriptor.id() + ": missing transitive dependency during type inference: "
+                                + e.getMessage());
+                continue;
+            }
             if (!extensionPointTypes.isEmpty()) {
                 implToEpTypes.put(implClass, extensionPointTypes);
                 for (Class<?> extensionPointType : extensionPointTypes) {
