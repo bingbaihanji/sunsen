@@ -236,7 +236,13 @@ public class DefaultPluginManager implements PluginManager {
 
     @Override
     public void startPlugins() {
-        List<String> snapshot = List.copyOf(topology);
+        List<String> snapshot;
+        managementLock.lock();
+        try {
+            snapshot = List.copyOf(topology);
+        } finally {
+            managementLock.unlock();
+        }
         for (String pluginId : snapshot) {
             PluginState state = stateMachine.getState(pluginId);
             if (state == PluginState.LOADED) {
@@ -247,7 +253,13 @@ public class DefaultPluginManager implements PluginManager {
 
     @Override
     public void stopPlugins() {
-        List<String> snapshot = new ArrayList<>(topology);
+        List<String> snapshot;
+        managementLock.lock();
+        try {
+            snapshot = new ArrayList<>(topology);
+        } finally {
+            managementLock.unlock();
+        }
         Collections.reverse(snapshot);
         for (String pluginId : snapshot) {
             PluginState state = stateMachine.getState(pluginId);
