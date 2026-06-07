@@ -63,8 +63,19 @@ public class HelloPlugin extends AbstractPlugin {
 
     /**
      * 配置使用枚举的小示例。
-     */
-    public enum LogLevel {DEBUG, INFO, WARN, ERROR}
+      * @author 冰白寒祭
+ * @date 2025
+ */
+    public enum LogLevel {
+        // 调试
+        DEBUG,
+        // 信息
+        INFO,
+        // 警告
+        WARN,
+        // 错误
+        ERROR
+    }
 }
 
 @Extension(order = 10, description = "英语问候")
