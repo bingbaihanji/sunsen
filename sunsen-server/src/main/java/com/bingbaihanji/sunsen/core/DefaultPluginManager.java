@@ -662,6 +662,16 @@ public class DefaultPluginManager implements PluginManager {
         this.extensionRegistry.setExtensionRegistrar(registrar);
     }
 
+    @Override
+    public void close() {
+        try {
+            stopPlugins();
+        } finally {
+            unloadPlugins();
+            eventBus.close();
+        }
+    }
+
     /**
      * 根据当前 plugins 快照重建拓扑顺序.
      * 调用方必须持有 managementLock.

@@ -87,6 +87,16 @@ public class PluginEventBus {
         }
     }
 
+    /**
+     * Shut down the underlying Executor if it is an ExecutorService.
+     * After this call, no new events will be dispatched.
+     */
+    public void close() {
+        if (executor instanceof java.util.concurrent.ExecutorService es) {
+            es.shutdown();
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private void dispatch(CopyOnWriteArrayList<Subscription<?>> list, PluginEvent event) {
         for (Subscription<?> sub : list) {
