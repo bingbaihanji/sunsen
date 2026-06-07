@@ -246,7 +246,12 @@ public class DefaultPluginManager implements PluginManager {
         for (String pluginId : snapshot) {
             PluginState state = stateMachine.getState(pluginId);
             if (state == PluginState.LOADED) {
-                startSinglePlugin(pluginId);
+                try {
+                    startSinglePlugin(pluginId);
+                } catch (Exception e) {
+                    LOGGER.log(System.Logger.Level.ERROR,
+                            () -> "Failed to start plugin: " + pluginId, e);
+                }
             }
         }
     }
@@ -264,7 +269,12 @@ public class DefaultPluginManager implements PluginManager {
         for (String pluginId : snapshot) {
             PluginState state = stateMachine.getState(pluginId);
             if (state == PluginState.ACTIVE) {
-                stopSinglePlugin(pluginId);
+                try {
+                    stopSinglePlugin(pluginId);
+                } catch (Exception e) {
+                    LOGGER.log(System.Logger.Level.ERROR,
+                            () -> "Failed to stop plugin: " + pluginId, e);
+                }
             }
         }
     }
@@ -343,6 +353,10 @@ public class DefaultPluginManager implements PluginManager {
         PluginEntry entry = plugins.get(pluginId);
         if (entry == null) {
             throw new PluginLoadException("插件不存在: " + pluginId);
+        }
+        PluginState state = stateMachine.getState(pluginId);
+        if (state != PluginState.ACTIVE) {
+            throw new PluginLoadException("插件状态不是 ACTIVE,无法停止: " + pluginId + " (当前状态: " + state + ")");
         }
         stopSinglePlugin(pluginId);
     }
@@ -761,13 +775,9 @@ public class DefaultPluginManager implements PluginManager {
             return;
         }
         stateMachine.transition(pluginId, current, PluginState.STARTING);
-        try {
-            stateMachine.executePhase(entry.plugin()::onStart, entry.descriptor(), PluginState.STARTING);
-            stateMachine.transition(pluginId, PluginState.STARTING, PluginState.ACTIVE);
-            eventBus.publish(new PluginStartedEvent(entry.descriptor()));
-        } catch (Exception e) {
-            // executePhase 已发布 PluginFailedEvent
-        }
+        stateMachine.executePhase(entry.plugin()::onStart, entry.descriptor(), PluginState.STARTING);
+        stateMachine.transition(pluginId, PluginState.STARTING, PluginState.ACTIVE);
+        eventBus.publish(new PluginStartedEvent(entry.descriptor()));
     }
 
     private void stopSinglePlugin(String pluginId) {
@@ -775,13 +785,9 @@ public class DefaultPluginManager implements PluginManager {
         if (entry == null) return;
 
         stateMachine.transition(pluginId, PluginState.ACTIVE, PluginState.STOPPING);
-        try {
-            stateMachine.executePhase(entry.plugin()::onStop, entry.descriptor(), PluginState.STOPPING);
-            stateMachine.transition(pluginId, PluginState.STOPPING, PluginState.STOPPED);
-            eventBus.publish(new PluginStoppedEvent(entry.descriptor()));
-        } catch (Exception e) {
-            // executePhase 已发布 PluginFailedEvent
-        }
+        stateMachine.executePhase(entry.plugin()::onStop, entry.descriptor(), PluginState.STOPPING);
+        stateMachine.transition(pluginId, PluginState.STOPPING, PluginState.STOPPED);
+        eventBus.publish(new PluginStoppedEvent(entry.descriptor()));
     }
 
     private void unloadSinglePlugin(String pluginId) {
