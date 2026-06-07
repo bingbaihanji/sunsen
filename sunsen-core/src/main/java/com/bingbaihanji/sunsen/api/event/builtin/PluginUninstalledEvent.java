@@ -7,6 +7,8 @@ import com.bingbaihanji.sunsen.api.event.AbstractPluginEvent;
  * 插件通过 {@code uninstallPlugin(String)} 卸载成功后触发.
  * <p>
  * 卸载 = 停止 + 卸载 + 删除 JAR 文件,三步完成后发布此事件.
+  * @author 冰白寒祭
+ * @date 2025
  */
 public class PluginUninstalledEvent extends AbstractPluginEvent {
 

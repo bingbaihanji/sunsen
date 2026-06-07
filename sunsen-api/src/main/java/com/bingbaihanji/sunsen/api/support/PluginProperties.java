@@ -25,6 +25,8 @@ import java.util.List;
  *     }
  * }
  * }</pre>
+  * @author 冰白寒祭
+ * @date 2025
  */
 public final class PluginProperties {
 

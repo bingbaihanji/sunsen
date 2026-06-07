@@ -2,6 +2,8 @@ package com.bingbaihanji.sunsen.api;
 
 /**
  * 插件生命周期状态枚举
+  * @author 冰白寒祭
+ * @date 2025
  */
 public enum PluginState {
     CREATED,   // 插件已创建 

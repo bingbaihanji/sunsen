@@ -18,6 +18,8 @@ import java.util.Set;
  * @param dependencies    插件依赖列表
  * @param permissions     插件权限集合
  * @param vendorInfo      插件供应商信息
+  * @author 冰白寒祭
+ * @date 2025
  */
 public record PluginDescriptor(
         String id,

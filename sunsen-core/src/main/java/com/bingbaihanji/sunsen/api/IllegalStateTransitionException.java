@@ -2,6 +2,8 @@ package com.bingbaihanji.sunsen.api;
 
 /**
  * 插件状态非法转换时抛出
+  * @author 冰白寒祭
+ * @date 2025
  */
 public class IllegalStateTransitionException extends SunsenException {
 

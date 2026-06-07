@@ -6,6 +6,8 @@ package com.bingbaihanji.sunsen.core.version;
  * @param major 主版本号
  * @param minor 次版本号
  * @param patch 修订版本号
+  * @author 冰白寒祭
+ * @date 2025
  */
 public record SemVer(
         int major,

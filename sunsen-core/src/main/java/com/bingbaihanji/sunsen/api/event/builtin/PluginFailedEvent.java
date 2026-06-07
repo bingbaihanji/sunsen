@@ -6,6 +6,8 @@ import com.bingbaihanji.sunsen.api.event.AbstractPluginEvent;
 
 /**
  * 插件进入 FAILED 状态时触发
+  * @author 冰白寒祭
+ * @date 2025
  */
 public class PluginFailedEvent extends AbstractPluginEvent {
 

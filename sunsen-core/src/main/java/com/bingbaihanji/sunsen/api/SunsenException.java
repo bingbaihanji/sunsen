@@ -2,6 +2,8 @@ package com.bingbaihanji.sunsen.api;
 
 /**
  * Sunsen 框架所有异常的根类
+  * @author 冰白寒祭
+ * @date 2025
  */
 public class SunsenException extends RuntimeException {
 

@@ -7,7 +7,12 @@ import com.bingbaihanji.sunsen.api.annotation.Extension;
 import com.bingbaihanji.sunsen.api.annotation.ExtensionPoint;
 
 import java.lang.reflect.Constructor;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
@@ -15,6 +20,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * <p>
  * 内部使用读写锁保证并发安全,支持单例与非单例两种扩展模式,
  * 并通过 {@link ExtensionRegistrar} 钩子将扩展生命周期同步到宿主容器
+  * @author 冰白寒祭
+ * @date 2025
  */
 public class ExtensionRegistry {
 

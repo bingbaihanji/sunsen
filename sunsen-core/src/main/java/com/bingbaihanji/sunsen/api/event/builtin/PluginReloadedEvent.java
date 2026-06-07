@@ -9,6 +9,8 @@ import com.bingbaihanji.sunsen.api.event.AbstractPluginEvent;
  * 与 {@link PluginUnloadedEvent} + {@link PluginLoadedEvent} 的区别:
  * 后两者都会发布(保持向后兼容),此事件额外携带新旧两个描述符,
  * 方便需要感知版本变化的宿主代码使用.
+  * @author 冰白寒祭
+ * @date 2025
  */
 public class PluginReloadedEvent extends AbstractPluginEvent {
 

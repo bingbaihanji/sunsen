@@ -8,12 +8,22 @@ import com.bingbaihanji.sunsen.api.annotation.ExtensionPoint;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.Enumeration;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 /**
  * 扫描插件 JAR 中的 {@link Extension} 标注类并注册到 {@link ExtensionRegistry}
+  * @author 冰白寒祭
+ * @date 2025
  */
 public class ExtensionScanner {
 

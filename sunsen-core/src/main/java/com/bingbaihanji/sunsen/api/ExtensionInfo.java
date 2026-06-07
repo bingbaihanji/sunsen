@@ -12,6 +12,8 @@ package com.bingbaihanji.sunsen.api;
  * @param pluginId           所属插件 ID
  * @param singleton          是否单例
  * @param extensionPointType 所实现的扩展点接口类型
+  * @author 冰白寒祭
+ * @date 2025
  */
 public record ExtensionInfo(
         String extensionId,

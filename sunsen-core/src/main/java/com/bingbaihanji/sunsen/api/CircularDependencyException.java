@@ -4,6 +4,8 @@ import java.util.List;
 
 /**
  * 检测到插件循环依赖时抛出
+  * @author 冰白寒祭
+ * @date 2025
  */
 public class CircularDependencyException extends SunsenException {
 

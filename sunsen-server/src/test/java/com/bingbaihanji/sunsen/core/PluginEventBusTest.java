@@ -3,7 +3,11 @@ package com.bingbaihanji.sunsen.core;
 import com.bingbaihanji.sunsen.api.PluginDescriptor;
 import com.bingbaihanji.sunsen.api.event.PluginEvent;
 import com.bingbaihanji.sunsen.api.event.PluginEventListener;
-import com.bingbaihanji.sunsen.api.event.builtin.*;
+import com.bingbaihanji.sunsen.api.event.builtin.PluginFailedEvent;
+import com.bingbaihanji.sunsen.api.event.builtin.PluginLoadedEvent;
+import com.bingbaihanji.sunsen.api.event.builtin.PluginStartedEvent;
+import com.bingbaihanji.sunsen.api.event.builtin.PluginStoppedEvent;
+import com.bingbaihanji.sunsen.api.event.builtin.PluginUnloadedEvent;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

@@ -1,6 +1,10 @@
 package com.bingbaihanji.sunsen.api.annotation;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * 标注在接口上,声明该接口为一个可扩展的契约点

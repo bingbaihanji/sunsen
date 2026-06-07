@@ -9,12 +9,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
 
 /**
  * 从插件 JAR 中读取 {@code META-INF/plugin.json} 并解析为 {@link PluginDescriptor}
+  * @author 冰白寒祭
+ * @date 2025
  */
 public final class PluginDescriptorLoader {
 

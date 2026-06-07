@@ -5,6 +5,8 @@ import com.bingbaihanji.sunsen.api.event.AbstractPluginEvent;
 
 /**
  * 插件进入 STOPPED 状态时触发
+  * @author 冰白寒祭
+ * @date 2025
  */
 public class PluginStoppedEvent extends AbstractPluginEvent {
 

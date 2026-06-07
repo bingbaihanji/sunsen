@@ -10,6 +10,8 @@ import java.nio.file.Path;
  * @param pluginId JAR 解析成功时为插件 ID;解析失败时为 JAR 文件名
  * @param jarPath  出错的 JAR 路径
  * @param cause    导致加载失败的异常
+  * @author 冰白寒祭
+ * @date 2025
  */
 public record PluginLoadError(String pluginId, Path jarPath, Exception cause) {
 }

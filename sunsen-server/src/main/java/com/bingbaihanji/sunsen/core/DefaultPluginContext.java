@@ -1,6 +1,12 @@
 package com.bingbaihanji.sunsen.core;
 
-import com.bingbaihanji.sunsen.api.*;
+import com.bingbaihanji.sunsen.api.ExtensionInfo;
+import com.bingbaihanji.sunsen.api.ExtensionRegistrar;
+import com.bingbaihanji.sunsen.api.PluginDescriptor;
+import com.bingbaihanji.sunsen.api.PluginLoadException;
+import com.bingbaihanji.sunsen.api.PluginManager;
+import com.bingbaihanji.sunsen.api.PluginContext;
+import com.bingbaihanji.sunsen.api.PluginPermissionException;
 import com.bingbaihanji.sunsen.api.event.PluginEvent;
 import com.bingbaihanji.sunsen.api.event.PluginEventListener;
 
@@ -18,6 +24,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * {@link PluginContext} 的默认实现
+  * @author 冰白寒祭
+ * @date 2025
  */
 public class DefaultPluginContext implements PluginContext {
 

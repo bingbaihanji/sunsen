@@ -5,6 +5,8 @@ import com.bingbaihanji.sunsen.api.event.AbstractPluginEvent;
 
 /**
  * 插件进入 UNLOADED 状态时触发
+  * @author 冰白寒祭
+ * @date 2025
  */
 public class PluginUnloadedEvent extends AbstractPluginEvent {
 
