@@ -2,6 +2,7 @@ package com.bingbaihanji.sunsen.core;
 
 import com.bingbaihanji.sunsen.api.PluginDescriptor;
 import com.bingbaihanji.sunsen.api.PluginLoadException;
+import com.bingbaihanji.sunsen.api.PluginManager;
 import com.bingbaihanji.sunsen.api.PluginState;
 
 import java.io.IOException;
@@ -48,7 +49,8 @@ public class PluginWatcher implements AutoCloseable {
 
     private static final System.Logger LOGGER = System.getLogger(PluginWatcher.class.getName());
 
-    private final DefaultPluginManager manager;
+    private final PluginManager manager;
+    private final Path pluginsDir;
     private final WatchService watchService;
     private final Thread watchThread;
     // pluginId -> jar path(用于删除事件的反查)
@@ -61,12 +63,13 @@ public class PluginWatcher implements AutoCloseable {
     /**
      * 构造并立即启动文件监听.
      *
-     * @param manager 已初始化的 {@link DefaultPluginManager}(需已调用 {@code setPluginsDir})
+     * @param manager    已初始化的插件管理器
+     * @param pluginsDir 插件监控目录
      * @throws IOException 若无法注册 WatchService 或目录不存在
      */
-    public PluginWatcher(DefaultPluginManager manager) throws IOException {
+    public PluginWatcher(PluginManager manager, Path pluginsDir) throws IOException {
         this.manager = manager;
-        Path pluginsDir = manager.getPluginsDir();
+        this.pluginsDir = pluginsDir;
         Files.createDirectories(pluginsDir);
 
         this.watchService = FileSystems.getDefault().newWatchService();
@@ -103,8 +106,15 @@ public class PluginWatcher implements AutoCloseable {
                 .start(this::watchLoop);
     }
 
+    /**
+     * @deprecated 使用 {@link #PluginWatcher(PluginManager, Path)} 代替
+     */
+    @Deprecated
+    public PluginWatcher(DefaultPluginManager manager) throws IOException {
+        this((PluginManager) manager, manager.getPluginsDir());
+    }
+
     private void watchLoop() {
-        Path pluginsDir = manager.getPluginsDir();
         while (running) {
             WatchKey key;
             try {
