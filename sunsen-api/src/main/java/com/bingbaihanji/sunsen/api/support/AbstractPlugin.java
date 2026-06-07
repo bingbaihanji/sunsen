@@ -51,6 +51,8 @@ import java.util.concurrent.ThreadFactory;
  */
 public abstract class AbstractPlugin implements Plugin {
 
+    private static final System.Logger LOGGER = System.getLogger(AbstractPlugin.class.getName());
+
     /**
      * onDestroy 时需要关闭的托管资源,按注册逆序关闭(LIFO).
      * 所有生命周期方法由框架顺序调用,无需线程安全容器.
@@ -95,7 +97,10 @@ public abstract class AbstractPlugin implements Plugin {
         for (int i = managedResources.size() - 1; i >= 0; i--) {
             try {
                 managedResources.get(i).close();
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        () -> pluginId() + ": failed to close managed resource "
+                              + managedResources.get(i).getClass().getName(), e);
             }
         }
         managedResources.clear();
@@ -202,6 +207,13 @@ public abstract class AbstractPlugin implements Plugin {
      */
     protected final <T> List<ExtensionInfo> extensionInfos(Class<T> extensionPoint) {
         return context.getExtensionInfos(extensionPoint);
+    }
+
+    /**
+     * 按 ID 获取单个扩展实例.
+     */
+    protected final <T> Optional<T> extension(Class<T> extensionPoint, String extensionId) {
+        return context.getExtension(extensionPoint, extensionId);
     }
 
     // ---- 事件 ----

@@ -5,6 +5,7 @@ import com.bingbaihanji.sunsen.api.event.PluginEventListener;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -43,6 +44,24 @@ public interface PluginContext {
      * 获取指定扩展点的所有实现
      */
     <T> List<T> getExtensions(Class<T> extensionPoint);
+
+    /**
+     * 按 ID 精确获取指定扩展点的单个扩展实例.
+     *
+     * @param extensionPoint 扩展点接口类型
+     * @param extensionId    扩展 ID（对应 {@code @Extension.id()} 的值）
+     * @return 扩展实例，未找到时返回 {@link Optional#empty()}
+     */
+    default <T> Optional<T> getExtension(Class<T> extensionPoint, String extensionId) {
+        List<ExtensionInfo> infos = getExtensionInfos(extensionPoint);
+        List<T> exts = getExtensions(extensionPoint);
+        for (int i = 0; i < infos.size() && i < exts.size(); i++) {
+            if (infos.get(i).extensionId().equals(extensionId)) {
+                return Optional.of(exts.get(i));
+            }
+        }
+        return Optional.empty();
+    }
 
     /**
      * 获取指定扩展点的元数据列表,不持有扩展实例引用.
