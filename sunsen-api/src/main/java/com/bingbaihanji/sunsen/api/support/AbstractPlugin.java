@@ -98,12 +98,14 @@ public abstract class AbstractPlugin implements Plugin {
     @Override
     public void onDestroy() {
         for (int i = managedResources.size() - 1; i >= 0; i--) {
+            AutoCloseable resource = managedResources.get(i);
             try {
-                managedResources.get(i).close();
+                resource.close();
             } catch (Exception e) {
+                final AutoCloseable res = resource;
                 LOGGER.log(System.Logger.Level.WARNING,
                         () -> pluginId() + ": failed to close managed resource "
-                                + managedResources.get(i).getClass().getName(), e);
+                                + res.getClass().getName(), e);
             }
         }
         managedResources.clear();
