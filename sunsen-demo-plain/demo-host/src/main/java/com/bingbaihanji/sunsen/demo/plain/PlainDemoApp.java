@@ -40,7 +40,8 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  *   demo-host ──→ sunsen-server（框架运行时）
  *   demo-plugins ──→ demo-api（实现契约接口）
  * </pre>
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public class PlainDemoApp {

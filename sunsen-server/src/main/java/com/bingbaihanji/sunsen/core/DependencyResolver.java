@@ -7,21 +7,14 @@ import com.bingbaihanji.sunsen.api.PluginLoadException;
 import com.bingbaihanji.sunsen.core.version.SemVer;
 import com.bingbaihanji.sunsen.core.version.VersionConstraint;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 插件依赖解析器,负责依赖存在性校验,版本约束校验,循环依赖检测与拓扑排序
  * <p>
  * 加载插件前必须先调用 {@link #resolve(List)} 完成校验,再通过 {@link #sort(List)} 获取安全的启动顺序
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public class DependencyResolver {

@@ -18,7 +18,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>
  * 所有状态转换均通过 CAS 原子操作完成,确保并发安全;非法转换会抛出
  * {@link IllegalStateTransitionException},异常场景可通过 {@link #forceSet} 强制回退
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public class LifecycleStateMachine {

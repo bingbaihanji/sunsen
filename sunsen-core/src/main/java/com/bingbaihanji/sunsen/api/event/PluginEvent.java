@@ -2,7 +2,8 @@ package com.bingbaihanji.sunsen.api.event;
 
 /**
  * 所有事件的基础接口
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public interface PluginEvent {

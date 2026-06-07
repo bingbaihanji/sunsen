@@ -5,16 +5,12 @@ import com.bingbaihanji.sunsen.api.PluginLoadException;
 
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 插件专用类加载器,继承 {@link URLClassLoader}
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public class PluginClassLoader extends URLClassLoader {

@@ -10,7 +10,8 @@ import java.util.concurrent.ThreadFactory;
 
 /**
  * 插件运行时上下文,作为插件访问框架能力的唯一入口
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public interface PluginContext {

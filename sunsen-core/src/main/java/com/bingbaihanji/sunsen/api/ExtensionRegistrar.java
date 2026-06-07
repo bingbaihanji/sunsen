@@ -3,7 +3,8 @@ package com.bingbaihanji.sunsen.api;
 /**
  * 扩展实例生命周期钩子
  * 框架创建和销毁扩展实例时触发此接口,用于将扩展生命周期同步到宿主容器
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public interface ExtensionRegistrar {

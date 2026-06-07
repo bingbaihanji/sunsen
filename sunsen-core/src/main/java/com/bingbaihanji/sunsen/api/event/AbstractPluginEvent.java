@@ -2,7 +2,8 @@ package com.bingbaihanji.sunsen.api.event;
 
 /**
  * 内置事件的抽象基类
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public abstract class AbstractPluginEvent implements PluginEvent {

@@ -38,7 +38,8 @@ import java.util.stream.Stream;
  *     }
  * }
  * }</pre>
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public final class PluginFileSystem implements AutoCloseable {

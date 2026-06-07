@@ -10,7 +10,8 @@ import java.util.concurrent.Executor;
 
 /**
  * 框架内置事件总线,默认同步分发,支持自定义线程池切换为异步模式
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public class PluginEventBus {

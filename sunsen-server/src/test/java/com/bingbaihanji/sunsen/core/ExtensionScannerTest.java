@@ -12,53 +12,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ExtensionScannerTest {
 
-    @ExtensionPoint
-    interface Greeting {
-        String say();
-    }
-
-    @ExtensionPoint(allowMultiple = false)
-    interface SingleUse {
-        String use();
-    }
-
-    @ExtensionPoint(allowMultiple = true)
-    interface MultiUse {
-        String use();
-    }
-
-    interface NotAnExtensionPoint {
-        void foo();
-    }
-
-    static class MixedInterface implements Greeting, NotAnExtensionPoint {
-        public String say() { return "hi"; }
-        public void foo() {}
-    }
-
-    static abstract class AbstractGreeting implements Greeting {}
-
-    @Extension
-    static class ConcreteGreeting extends AbstractGreeting {
-        public String say() { return "hello"; }
-    }
-
-    static class PureNotExtension implements NotAnExtensionPoint {
-        public void foo() {}
-    }
-
-    @Extension(id = "a", order = 0)
-    static class SingleA implements SingleUse { public String use() { return "a"; } }
-
-    @Extension(id = "b", order = 1)
-    static class SingleB implements SingleUse { public String use() { return "b"; } }
-
-    @Extension
-    static class MultiA implements MultiUse { public String use() { return "a"; } }
-
-    @Extension
-    static class MultiB implements MultiUse { public String use() { return "b"; } }
-
     @Test
     void inferExtensionPointTypesDirectInterface() {
         List<Class<?>> types = ExtensionScanner.inferExtensionPointTypes(MixedInterface.class);
@@ -103,5 +56,76 @@ class ExtensionScannerTest {
         );
         ExtensionScanner scanner = new ExtensionScanner(null);
         assertDoesNotThrow(() -> scanner.validateSingleExtensions(map));
+    }
+
+    @ExtensionPoint
+    interface Greeting {
+        String say();
+    }
+
+    @ExtensionPoint(allowMultiple = false)
+    interface SingleUse {
+        String use();
+    }
+
+    @ExtensionPoint(allowMultiple = true)
+    interface MultiUse {
+        String use();
+    }
+
+    interface NotAnExtensionPoint {
+        void foo();
+    }
+
+    static class MixedInterface implements Greeting, NotAnExtensionPoint {
+        public String say() {
+            return "hi";
+        }
+
+        public void foo() {
+        }
+    }
+
+    static abstract class AbstractGreeting implements Greeting {
+    }
+
+    @Extension
+    static class ConcreteGreeting extends AbstractGreeting {
+        public String say() {
+            return "hello";
+        }
+    }
+
+    static class PureNotExtension implements NotAnExtensionPoint {
+        public void foo() {
+        }
+    }
+
+    @Extension(id = "a", order = 0)
+    static class SingleA implements SingleUse {
+        public String use() {
+            return "a";
+        }
+    }
+
+    @Extension(id = "b", order = 1)
+    static class SingleB implements SingleUse {
+        public String use() {
+            return "b";
+        }
+    }
+
+    @Extension
+    static class MultiA implements MultiUse {
+        public String use() {
+            return "a";
+        }
+    }
+
+    @Extension
+    static class MultiB implements MultiUse {
+        public String use() {
+            return "b";
+        }
     }
 }

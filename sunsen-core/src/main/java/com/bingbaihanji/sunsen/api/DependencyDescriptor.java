@@ -8,7 +8,7 @@ import java.util.Objects;
  * @param id                依赖插件的唯一标识符
  * @param versionConstraint 依赖版本约束表达式
  * @param optional          是否为可选依赖
-  * @author 冰白寒祭
+ * @author 冰白寒祭
  * @date 2025
  */
 public record DependencyDescriptor(String id, String versionConstraint, boolean optional) {

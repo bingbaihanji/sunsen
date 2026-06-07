@@ -63,9 +63,10 @@ public class HelloPlugin extends AbstractPlugin {
 
     /**
      * 配置使用枚举的小示例。
-      * @author 冰白寒祭
- * @date 2025
- */
+     *
+     * @author 冰白寒祭
+     * @date 2025
+     */
     public enum LogLevel {
         // 调试
         DEBUG,

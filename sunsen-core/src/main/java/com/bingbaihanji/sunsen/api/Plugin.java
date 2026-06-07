@@ -2,7 +2,8 @@ package com.bingbaihanji.sunsen.api;
 
 /**
  * 插件生命周期接口
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public interface Plugin {

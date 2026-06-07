@@ -2,7 +2,8 @@ package com.bingbaihanji.sunsen.api;
 
 /**
  * 插件加载过程中发生的异常
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public class PluginLoadException extends SunsenException {

@@ -1,4 +1,4 @@
-# Sunsen(桑生)插件系统
+# Sunsen (桑生)插件系统
 
 Sunsen 是一个轻量级的 Java 插件框架，名字取自"三生万物"的谐音，也暗合"桑葚"成簇共生的意象——主框架是枝干，插件是果实，各自独立又同枝共生。
 
@@ -17,11 +17,11 @@ LOGO:
 
 做这个框架的时候，我主要参考了三个东西，但都没有深度绑定：
 
-| 参考来源                       | 拿来了什么                                                                  | 怎么实现的                                                                           |
-|----------------------------|------------------------------------------------------------------------|---------------------------------------------------------------------------------|
+| 参考来源                   | 拿来了什么                                                                             | 怎么实现的                                                                                                 |
+|----------------------------|----------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
 | **IntelliJ IDEA Platform** | 每个插件独立 ClassLoader，通过 Extension Point / Extension 解耦，`plugin.xml` 声明依赖 | 自定义 `PluginClassLoader` 打破双亲委派（只针对插件自有类），`plugin.json` 代替 XML，`@Extension` 自动扫描 |
-| **Spring Boot**            | 自动装配、生命周期事件                                                            | `sunsen-core` 零第三方依赖（只有 JDK），通过 `ExtensionRegistrar` 接口让宿主自行对接 Spring 等容器       |
-| **OSGi / PF4J**            | 依赖拓扑排序、循环依赖检测、热重载                                                      | `DependencyResolver` 做 DAG 校验和 Kahn 拓扑排序，`reloadPlugin()` 做原子替换                 |
+| **Spring Boot**            | 自动装配、生命周期事件                                                                 | `sunsen-core` 零第三方依赖（只有 JDK），通过 `ExtensionRegistrar` 接口让宿主自行对接 Spring 等容器         |
+| **OSGi / PF4J**            | 依赖拓扑排序、循环依赖检测、热重载                                                     | `DependencyResolver` 做 DAG 校验和 Kahn 拓扑排序，`reloadPlugin()` 做原子替换                              |
 
 ### 1.2 几条铁律
 
@@ -66,7 +66,7 @@ LOGO:
 └─────────────────────────────────────────────────────┘
 ```
 
-- **`sunsen-core`**：纯接口、注解、record、异常，**零外部依赖**。所有跨 ClassLoader 的类型必须在这里定义，保证类型一致性。宿主和插件都需要它
+- **`sunsen-core`**：纯接口、注解、record、异常， **零外部依赖**。所有跨 ClassLoader 的类型必须在这里定义，保证类型一致性。宿主和插件都需要它
 - **`sunsen-api`**：插件开发模块，依赖 `sunsen-core`。提供 `AbstractPlugin`、`ManagedScheduler`、`PluginProperties` 等开发便利类
 - **`sunsen-server`**：标准实现，包括类加载器、扩展注册表、生命周期调度、依赖解析、事件总线。依赖 `sunsen-core`，唯一的外部依赖是
   `jackson-databind`（解析 `plugin.json`）
@@ -138,7 +138,8 @@ sunsen/
 1. **已加载的类**：直接返回
 2. **公共 API 和 JDK**：`java.*`、`javax.*`、`sun.*`、`com.bingbaihanji.sunsen.api.*` 强制走父加载器，保证所有插件看到的
    `Plugin` 接口是同一个 Class 对象。这些类型定义在 `sunsen-core` 模块中
-3. **插件自有类**：如果类名命中 `plugin.json` 里声明的 `packagePrefixes`，就打破双亲委派，自己加载。多个前缀时用**最长匹配**
+3. **插件自有类**：如果类名命中 `plugin.json` 里声明的 `packagePrefixes`，就打破双亲委派，自己加载。多个前缀时用
+   **最长匹配**
 4. **依赖插件的类**：按依赖顺序去依赖插件的 ClassLoader 里找
 5. **兜底**：都找不到就委托父加载器
 
@@ -177,13 +178,13 @@ public class LogTaskHandler implements TaskHandler {
 **关键时序**：
 
 框架在插件进入 `LOADED` 时（`onInit()` 之后、`onStart()` 之前）自动扫描 JAR 里所有 `@Extension` 类，注册到
-`ExtensionRegistry`。这意味着**第一个插件的 `onStart()` 被调用时，所有插件的扩展都已经就绪**，彻底杜绝了在 `onStart()`
+`ExtensionRegistry`。这意味着 **第一个插件的 `onStart()` 被调用时，所有插件的扩展都已经就绪**，彻底杜绝了在 `onStart()`
 里注册扩展导致的时序依赖问题。
 
-**`allowMultiple = false`**：如果扩展点设置了 `allowMultiple = false`，`ExtensionScanner` 会在**同一插件内**
+**`allowMultiple = false`**：如果扩展点设置了 `allowMultiple = false`，`ExtensionScanner` 会在 **同一插件内**
 校验该扩展点的实现数量不能超过 1 个，否则加载失败。跨插件的多个实现是允许的。
 
-**`sole = true`**：如果扩展点设置了 `sole = true`，框架会确保**整个系统**中只有一个插件的实现被注册。当多个插件都提供了实现时，框架打印警告并只保留
+**`sole = true`**：如果扩展点设置了 `sole = true`，框架会确保 **整个系统**中只有一个插件的实现被注册。当多个插件都提供了实现时，框架打印警告并只保留
 `@Extension(order)` 最小（优先级最高）的一个。被舍弃的实现会从注册表中移除，且即使竞争方后续卸载也不会自动恢复。适用于数据库驱动、认证后端等低频变更的基础设施选择。
 
 宿主通过 `pluginManager.getExtensions(TaskHandler.class)` 获取按 `@Extension.order` 排好序的扩展实例列表。
@@ -223,21 +224,21 @@ public class LogTaskHandler implements TaskHandler {
             FAILED ──unload()──> UNLOADED(强制清理)
 ```
 
-| 状态         | 含义                                       |
-|------------|------------------------------------------|
-| `CREATED`  | JAR 被发现，`PluginDescriptor` 解析完成          |
-| `RESOLVED` | 依赖校验通过，ClassLoader 已创建，主类还没实例化           |
+| 状态       | 含义                                                     |
+|------------|----------------------------------------------------------|
+| `CREATED`  | JAR 被发现，`PluginDescriptor` 解析完成                  |
+| `RESOLVED` | 依赖校验通过，ClassLoader 已创建，主类还没实例化         |
 | `LOADED`   | 主类实例化完成，`onInit()` 已调用，`@Extension` 扫描完成 |
-| `STARTING` | `onStart()` 执行中                          |
-| `ACTIVE`   | 正常运行                                     |
-| `STOPPING` | `onStop()` 执行中                           |
-| `STOPPED`  | 已停止，可以 `start()` 重新启动                    |
-| `FAILED`   | 异常终止，只能通过 `unload()` 清理                  |
-| `UNLOADED` | ClassLoader 已释放，扩展已注销，不可逆                |
+| `STARTING` | `onStart()` 执行中                                       |
+| `ACTIVE`   | 正常运行                                                 |
+| `STOPPING` | `onStop()` 执行中                                        |
+| `STOPPED`  | 已停止，可以 `start()` 重新启动                          |
+| `FAILED`   | 异常终止，只能通过 `unload()` 清理                       |
+| `UNLOADED` | ClassLoader 已释放，扩展已注销，不可逆                   |
 
 **生命周期方法该干啥**：
 
-- `onInit(PluginContext)`：注入上下文，做轻量初始化（读配置、准备数据结构）。**不要在这里启动后台线程或注册监听器**
+- `onInit(PluginContext)`：注入上下文，做轻量初始化（读配置、准备数据结构）。 **不要在这里启动后台线程或注册监听器**
 - `onStart()`：启动业务逻辑、后台线程、注册外部监听器。这时扩展已经全部就绪，可以安全调用 `getExtensions()`
 - `onStop()`：停止后台线程、取消监听器、释放网络连接等可以重新获取的资源
 - `onDestroy()`：最终清理，释放所有强引用，确保 ClassLoader 能被 GC
@@ -289,18 +290,18 @@ public class LogTaskHandler implements TaskHandler {
 }
 ```
 
-| 字段                | 必填 | 说明                                                                          |
-|-------------------|----|-----------------------------------------------------------------------------|
-| `id`              | 是  | 全局唯一标识，建议反向域名                                                               |
-| `name`            | 是  | 展示名称                                                                        |
-| `description`     | 否  | 插件功能描述                                                                      |
-| `version`         | 是  | SemVer 格式                                                                   |
-| `apiVersion`      | 是  | 编译时依赖的 Sunsen API 版本号, 只需 major 版本号与框架的 `SunsenVersion.API_VERSION` 一致即视为兼容 |
-| `vendor`          | 否  | 作者/厂商信息，解析为 `vendorInfo` Map                                                |
-| `mainClass`       | 是  | 实现 `Plugin` 接口的入口类全限定名                                                      |
-| `packagePrefixes` | 是  | 插件私有包前缀，类隔离的核心配置                                                            |
-| `dependencies`    | 否  | 依赖列表，支持版本约束和 optional 标记                                                    |
-| `permissions`     | 否  | 运行时权限声明                                                                     |
+| 字段              | 必填 | 说明                                                                                                 |
+|-------------------|------|------------------------------------------------------------------------------------------------------|
+| `id`              | 是   | 全局唯一标识，建议反向域名                                                                           |
+| `name`            | 是   | 展示名称                                                                                             |
+| `description`     | 否   | 插件功能描述                                                                                         |
+| `version`         | 是   | SemVer 格式                                                                                          |
+| `apiVersion`      | 是   | 编译时依赖的 Sunsen API 版本号, 只需 major 版本号与框架的 `SunsenVersion.API_VERSION` 一致即视为兼容 |
+| `vendor`          | 否   | 作者/厂商信息，解析为 `vendorInfo` Map                                                               |
+| `mainClass`       | 是   | 实现 `Plugin` 接口的入口类全限定名                                                                   |
+| `packagePrefixes` | 是   | 插件私有包前缀，类隔离的核心配置                                                                     |
+| `dependencies`    | 否   | 依赖列表，支持版本约束和 optional 标记                                                               |
+| `permissions`     | 否   | 运行时权限声明                                                                                       |
 
 ---
 
@@ -538,13 +539,13 @@ public interface PluginEventListener<T extends PluginEvent> {
 
 ### 内置生命周期事件
 
-| 事件类                   | 触发时机                                  |
-|-----------------------|---------------------------------------|
-| `PluginLoadedEvent`   | 插件进入 `LOADED` 状态（`@Extension` 扫描完成后）  |
-| `PluginStartedEvent`  | 插件进入 `ACTIVE` 状态                      |
-| `PluginStoppedEvent`  | 插件进入 `STOPPED` 状态                     |
-| `PluginUnloadedEvent` | 插件进入 `UNLOADED` 状态（ClassLoader 释放前）   |
-| `PluginFailedEvent`   | 插件进入 `FAILED` 状态，携带 `Throwable cause` |
+| 事件类                | 触发时机                                          |
+|-----------------------|---------------------------------------------------|
+| `PluginLoadedEvent`   | 插件进入 `LOADED` 状态（`@Extension` 扫描完成后） |
+| `PluginStartedEvent`  | 插件进入 `ACTIVE` 状态                            |
+| `PluginStoppedEvent`  | 插件进入 `STOPPED` 状态                           |
+| `PluginUnloadedEvent` | 插件进入 `UNLOADED` 状态（ClassLoader 释放前）    |
+| `PluginFailedEvent`   | 插件进入 `FAILED` 状态，携带 `Throwable cause`    |
 
 ### 订阅事件
 
@@ -663,7 +664,7 @@ DefaultPluginManager manager = new DefaultPluginManager(new PluginEventBus(execu
 
 ### 背景
 
-Java 17 废弃了 `SecurityManager`，Java 21 正式移除了。所以 Sunsen 不依赖 `SecurityManager`，而是采用**网关拦截模式**。
+Java 17 废弃了 `SecurityManager`，Java 21 正式移除了。所以 Sunsen 不依赖 `SecurityManager`，而是采用 **网关拦截模式**。
 
 ### 怎么拦截
 
@@ -691,13 +692,13 @@ public class SecurePluginContext extends DefaultPluginContext {
 
 ### 权限粒度（参考）
 
-| 权限字符串           | 允许的操作                       |
-|-----------------|-----------------------------|
-| `file:read`     | 读取插件工作目录内的文件                |
-| `file:write`    | 写入插件工作目录内的文件                |
+| 权限字符串      | 允许的操作                            |
+|-----------------|---------------------------------------|
+| `file:read`     | 读取插件工作目录内的文件              |
+| `file:write`    | 写入插件工作目录内的文件              |
 | `plugin:query`  | 通过 `PluginContext` 查询其他插件状态 |
-| `event:publish` | 发布自定义事件                     |
-| `extension:get` | 获取其他插件的扩展实例                 |
+| `event:publish` | 发布自定义事件                        |
+| `extension:get` | 获取其他插件的扩展实例                |
 
 权限字符串本身没有硬编码语义，框架只提供检查机制，宿主可以自己扩展。
 
@@ -841,18 +842,18 @@ getMessage())
 
 ## 十、关键设计决策
 
-| 决策                               | 为什么这么做                                           |
-|----------------------------------|--------------------------------------------------|
-| 扩展注册在 `LOADED` 阶段（而不是 `onStart`） | 保证所有扩展在任何 `onStart()` 之前就已经可见，消除时序依赖             |
-| 独立的 `FAILED` 状态                  | 区分主动停止和异常终止，方便精准告警和排查                            |
-| `PluginContext` 作为权限网关           | Java 21 已经移除了 `SecurityManager`，这是当前最实际的沙箱手段     |
-| `ExtensionRegistry` 读写锁          | 热重载期间扩展替换是原子的，读操作不会被阻塞                           |
-| `afterExtensionDestroyed` 钩子     | 热重载语义完整性的基础，防止宿主容器持有悬空引用导致内存泄漏                   |
-| `sole` 与 `allowMultiple` 正交设计    | `allowMultiple` 管单个插件内， `sole` 管跨插件全局，两者不重叠，语义清晰 |
-| 事件总线内置于框架                        | 插件间解耦通信，避免直接类引用跨越 ClassLoader 边界                 |
-| `PluginDescriptor` 用 record      | 不可变，天然线程安全，省掉一堆样板代码                              |
-| CAS 状态机                          | 状态转换并发安全，不会出现竞态条件                                |
-| 扩展点接口放独立 `{app}-api` 模块          | 插件只依赖契约接口，不依赖宿主业务代码，实现真正解耦；`demo-api` 示范此模式      |
+| 决策                                         | 为什么这么做                                                                |
+|----------------------------------------------|-----------------------------------------------------------------------------|
+| 扩展注册在 `LOADED` 阶段（而不是 `onStart`） | 保证所有扩展在任何 `onStart()` 之前就已经可见，消除时序依赖                 |
+| 独立的 `FAILED` 状态                         | 区分主动停止和异常终止，方便精准告警和排查                                  |
+| `PluginContext` 作为权限网关                 | Java 21 已经移除了 `SecurityManager`，这是当前最实际的沙箱手段              |
+| `ExtensionRegistry` 读写锁                   | 热重载期间扩展替换是原子的，读操作不会被阻塞                                |
+| `afterExtensionDestroyed` 钩子               | 热重载语义完整性的基础，防止宿主容器持有悬空引用导致内存泄漏                |
+| `sole` 与 `allowMultiple` 正交设计           | `allowMultiple` 管单个插件内， `sole` 管跨插件全局，两者不重叠，语义清晰    |
+| 事件总线内置于框架                           | 插件间解耦通信，避免直接类引用跨越 ClassLoader 边界                         |
+| `PluginDescriptor` 用 record                 | 不可变，天然线程安全，省掉一堆样板代码                                      |
+| CAS 状态机                                   | 状态转换并发安全，不会出现竞态条件                                          |
+| 扩展点接口放独立 `{app}-api` 模块            | 插件只依赖契约接口，不依赖宿主业务代码，实现真正解耦；`demo-api` 示范此模式 |
 
 ---
 
@@ -860,13 +861,13 @@ getMessage())
 
 ### 为什么需要独立的契约模块
 
-宿主定义扩展点接口，插件实现它——这意味着插件需要在编译时看到接口定义。**接口放在哪里决定了耦合方向**：
+宿主定义扩展点接口，插件实现它——这意味着插件需要在编译时看到接口定义。 **接口放在哪里决定了耦合方向**：
 
-| 接口放在哪里                    | 插件需要依赖什么            | 耦合度          |
-|---------------------------|---------------------|--------------|
-| 宿主项目（反面教材）                | 整个宿主业务模块            | 高，宿主变更影响所有插件 |
-| `sunsen-core`（框架级）        | 只适合框架自带接口，业务接口不能放这里 | —            |
-| **独立 `{app}-api` 模块（推荐）** | 只需轻量契约包，不依赖宿主任何实现   | 低            |
+| 接口放在哪里                      | 插件需要依赖什么                       | 耦合度                   |
+|-----------------------------------|----------------------------------------|--------------------------|
+| 宿主项目（反面教材）              | 整个宿主业务模块                       | 高，宿主变更影响所有插件 |
+| `sunsen-core`（框架级）           | 只适合框架自带接口，业务接口不能放这里 | —                        |
+| **独立 `{app}-api` 模块（推荐）** | 只需轻量契约包，不依赖宿主任何实现     | 低                       |
 
 ### 标准三层模块结构
 
@@ -878,7 +879,7 @@ getMessage())
  依赖 api + sunsen-server    依赖 api + sunsen-api
 ```
 
-宿主和插件**互不依赖**，都只依赖 `{app}-api`。
+宿主和插件 **互不依赖**，都只依赖 `{app}-api`。
 
 ### demo-api 示范
 
@@ -905,8 +906,7 @@ pluginManager.getExtensions(Greeter.class).forEach(g -> g.greet("Sunsen"));
 
 ### 在 ClassLoader 模型下的工作原理
 
-`{app}-api` 的 JAR 在宿主 classpath 上，由父 ClassLoader 加载。`PluginClassLoader` 的加载规则保证：任何
-插件中对 `Greeter.class` 的查找都会委托到父加载器，因此**所有插件和宿主看到的是同一个 `Class` 对象**，
-强制类型转换不会失败。
+`{app}-api` 的 JAR 在宿主 classpath 上，由父 ClassLoader 加载。`PluginClassLoader` 的加载规则保证：任何 插件中对
+`Greeter.class` 的查找都会委托到父加载器，因此 **所有插件和宿主看到的是同一个 `Class` 对象**， 强制类型转换不会失败。
 
-`{app}-api` 中的类**不能**出现在任何插件的 `packagePrefixes` 中——那样会导致前缀冲突直接拒绝加载。
+`{app}-api` 中的类 **不能**出现在任何插件的 `packagePrefixes` 中——那样会导致前缀冲突直接拒绝加载。

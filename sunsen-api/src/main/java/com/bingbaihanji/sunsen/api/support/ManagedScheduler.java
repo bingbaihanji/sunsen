@@ -1,10 +1,6 @@
 package com.bingbaihanji.sunsen.api.support;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -28,7 +24,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 单线程模式线程名为 {@code plugin-scheduler-<pluginId>};
  * 多线程模式为 {@code plugin-scheduler-<pluginId>-1},{@code plugin-scheduler-<pluginId>-2} ......
  * 便于线程转储(thread dump)中定位问题来源.
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public final class ManagedScheduler implements AutoCloseable {

@@ -1,12 +1,6 @@
 package com.bingbaihanji.sunsen.core;
 
-import com.bingbaihanji.sunsen.api.ExtensionInfo;
-import com.bingbaihanji.sunsen.api.ExtensionRegistrar;
-import com.bingbaihanji.sunsen.api.PluginDescriptor;
-import com.bingbaihanji.sunsen.api.PluginLoadException;
-import com.bingbaihanji.sunsen.api.PluginManager;
-import com.bingbaihanji.sunsen.api.PluginContext;
-import com.bingbaihanji.sunsen.api.PluginPermissionException;
+import com.bingbaihanji.sunsen.api.*;
 import com.bingbaihanji.sunsen.api.event.PluginEvent;
 import com.bingbaihanji.sunsen.api.event.PluginEventListener;
 
@@ -15,7 +9,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -24,11 +17,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * {@link PluginContext} 的默认实现
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public class DefaultPluginContext implements PluginContext {
 
+    private static final Set<String> ALLOWED_METHODS = Set.of(
+            "getPlugin", "getPlugins", "getPluginState", "isPluginActive",
+            "getExtensions", "getExtension", "getExtensionInfos",
+            "publishEvent", "subscribe", "unsubscribe", "close"
+    );
     // 当前插件的描述符
     private final PluginDescriptor descriptor;
     // 扩展注册表,用于获取扩展实例
@@ -39,14 +38,14 @@ public class DefaultPluginContext implements PluginContext {
     private final PluginManager pluginManager;
     // 插件专属工作目录
     private final Path pluginWorkDir;
-    // 插件配置属性
-    private volatile Properties configProperties = new Properties();
     // 本上下文注册的事件订阅列表
     private final List<Subscription<?>> subscriptions = new CopyOnWriteArrayList<>();
     // 插件专属线程组,卸载时统一 interrupt
     private final ThreadGroup threadGroup;
     // 线程命名计数器
     private final AtomicInteger threadCounter = new AtomicInteger(0);
+    // 插件配置属性
+    private volatile Properties configProperties = new Properties();
 
     /**
      * @param descriptor        插件描述符
@@ -172,21 +171,6 @@ public class DefaultPluginContext implements PluginContext {
         };
     }
 
-    /**
-     * 事件订阅记录
-     *
-     * @param eventType 事件类型
-     * @param listener  事件监听器
-     */
-    private record Subscription<T extends PluginEvent>(Class<T> eventType, PluginEventListener<T> listener) {
-    }
-
-    private static final Set<String> ALLOWED_METHODS = Set.of(
-            "getPlugin", "getPlugins", "getPluginState", "isPluginActive",
-            "getExtensions", "getExtension", "getExtensionInfos",
-            "publishEvent", "subscribe", "unsubscribe", "close"
-    );
-
     @SuppressWarnings("unchecked")
     private PluginManager createManagerView() {
         final PluginManager delegate = pluginManager;
@@ -226,5 +210,14 @@ public class DefaultPluginContext implements PluginContext {
                     };
                 }
         );
+    }
+
+    /**
+     * 事件订阅记录
+     *
+     * @param eventType 事件类型
+     * @param listener  事件监听器
+     */
+    private record Subscription<T extends PluginEvent>(Class<T> eventType, PluginEventListener<T> listener) {
     }
 }

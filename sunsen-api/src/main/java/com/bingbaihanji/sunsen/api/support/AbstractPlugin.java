@@ -1,12 +1,6 @@
 package com.bingbaihanji.sunsen.api.support;
 
-import com.bingbaihanji.sunsen.api.ExtensionInfo;
-import com.bingbaihanji.sunsen.api.Plugin;
-import com.bingbaihanji.sunsen.api.PluginContext;
-import com.bingbaihanji.sunsen.api.PluginDescriptor;
-import com.bingbaihanji.sunsen.api.PluginManager;
-import com.bingbaihanji.sunsen.api.PluginPermissionException;
-import com.bingbaihanji.sunsen.api.PluginState;
+import com.bingbaihanji.sunsen.api.*;
 import com.bingbaihanji.sunsen.api.event.PluginEvent;
 import com.bingbaihanji.sunsen.api.event.PluginEventListener;
 
@@ -54,7 +48,8 @@ import java.util.concurrent.ThreadFactory;
  *     // onDestroy 无需覆盖:托管资源会被自动关闭,context 会被自动清空
  * }
  * }</pre>
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public abstract class AbstractPlugin implements Plugin {
@@ -108,7 +103,7 @@ public abstract class AbstractPlugin implements Plugin {
             } catch (Exception e) {
                 LOGGER.log(System.Logger.Level.WARNING,
                         () -> pluginId() + ": failed to close managed resource "
-                              + managedResources.get(i).getClass().getName(), e);
+                                + managedResources.get(i).getClass().getName(), e);
             }
         }
         managedResources.clear();

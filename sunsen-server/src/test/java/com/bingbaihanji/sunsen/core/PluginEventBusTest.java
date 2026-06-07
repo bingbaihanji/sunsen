@@ -3,20 +3,22 @@ package com.bingbaihanji.sunsen.core;
 import com.bingbaihanji.sunsen.api.PluginDescriptor;
 import com.bingbaihanji.sunsen.api.event.PluginEvent;
 import com.bingbaihanji.sunsen.api.event.PluginEventListener;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginFailedEvent;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginLoadedEvent;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginStartedEvent;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginStoppedEvent;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginUnloadedEvent;
+import com.bingbaihanji.sunsen.api.event.builtin.*;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 class PluginEventBusTest {
+
+    private static PluginDescriptor descriptor(String id, String version) {
+        return new PluginDescriptor(id, "Test", "", version, "1.0", "com.test.Main",
+                List.of("com.test"), List.of(), java.util.Set.of(), java.util.Map.of());
+    }
 
     @Test
     void exactTypeMatching() {
@@ -90,7 +92,9 @@ class PluginEventBusTest {
         PluginEventBus bus = new PluginEventBus();
         AtomicInteger counter = new AtomicInteger();
 
-        bus.subscribe(PluginLoadedEvent.class, e -> { throw new RuntimeException("boom"); });
+        bus.subscribe(PluginLoadedEvent.class, e -> {
+            throw new RuntimeException("boom");
+        });
         bus.subscribe(PluginLoadedEvent.class, e -> counter.incrementAndGet());
 
         bus.publish(new PluginLoadedEvent(descriptor("a", "1.0")));
@@ -108,10 +112,5 @@ class PluginEventBusTest {
 
         assertEquals(1, dispatchThreads.size());
         assertSame(callerThread, dispatchThreads.get(0));
-    }
-
-    private static PluginDescriptor descriptor(String id, String version) {
-        return new PluginDescriptor(id, "Test", "", version, "1.0", "com.test.Main",
-                List.of("com.test"), List.of(), java.util.Set.of(), java.util.Map.of());
     }
 }

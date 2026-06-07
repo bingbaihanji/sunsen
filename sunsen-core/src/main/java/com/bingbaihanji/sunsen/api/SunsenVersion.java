@@ -2,7 +2,8 @@ package com.bingbaihanji.sunsen.api;
 
 /**
  * Sunsen 框架版本常量
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public final class SunsenVersion {

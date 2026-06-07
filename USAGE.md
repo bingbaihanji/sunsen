@@ -1,6 +1,6 @@
 # Sunsen 插件框架 — 使用指南
 
-> 本文档面向**宿主应用开发者**与**插件开发者**,帮助你在 5 分钟内上手 Sunsen
+> 本文档面向 **宿主应用开发者**与 **插件开发者**,帮助你在 5 分钟内上手 Sunsen
 
 ---
 
@@ -8,7 +8,7 @@
 
 ### 推荐：三模块结构
 
-真实项目应将**扩展点接口单独抽成一个契约模块**（`{your-app}-api`），宿主和插件分别依赖它，互不依赖：
+真实项目应将 **扩展点接口单独抽成一个契约模块**（`{your-app}-api`），宿主和插件分别依赖它，互不依赖：
 
 ```
 {your-app}-api    ← 只放扩展点接口和跨插件事件
@@ -76,11 +76,11 @@
 
 ---
 
-## 二、宿主应用接入(5 分钟速成)
+## 二、宿主应用接入 (5 分钟速成)
 
 ### 2.1 定义扩展点
 
-扩展点是**宿主与插件之间的契约接口**，应定义在独立的 `{app}-api` 模块中，并标注 `@ExtensionPoint`:
+扩展点是 **宿主与插件之间的契约接口**，应定义在独立的 `{app}-api` 模块中，并标注 `@ExtensionPoint`:
 
 ```java
 // 在 {your-app}-api 模块中定义，而非宿主业务模块
@@ -96,11 +96,11 @@ public interface Greeter {
 
 **关键规则**:
 
-- 扩展点接口必须位于**宿主 classpath**（父 ClassLoader 可见），确保所有插件共享同一类型；推荐放在独立的 `{app}-api` 模块中
-- 扩展点接口**不能**出现在任何插件的 `packagePrefixes` 范围内，否则插件加载时会报前缀冲突错误
+- 扩展点接口必须位于 **宿主 classpath**（父 ClassLoader 可见），确保所有插件共享同一类型；推荐放在独立的 `{app}-api` 模块中
+- 扩展点接口 **不能**出现在任何插件的 `packagePrefixes` 范围内，否则插件加载时会报前缀冲突错误
 - `id` 为空时,框架自动使用接口全限定名作为 key
-- `allowMultiple = false` 时,框架会校验**同一插件内**该扩展点的实现数量恰好为 1,否则拒绝加载;跨插件的多个实现仍允许
-- `sole = true` 时,框架确保**整个系统**中只有一个插件的实现被注册,冲突时保留 `order` 最小(优先级最高)的一个,并打印警告
+- `allowMultiple = false` 时,框架会校验 **同一插件内**该扩展点的实现数量恰好为 1,否则拒绝加载;跨插件的多个实现仍允许
+- `sole = true` 时,框架确保 **整个系统**中只有一个插件的实现被注册,冲突时保留 `order` 最小 (优先级最高)的一个,并打印警告
 
 ### 2.2 创建插件管理器
 
@@ -173,7 +173,7 @@ getMessage());
 
 ### 3.1 插件项目结构
 
-插件是一个**普通的 JAR 包**,结构如下:
+插件是一个 **普通的 JAR 包**,结构如下:
 
 ```
 my-plugin.jar
@@ -329,12 +329,12 @@ public class HelloPlugin implements Plugin {
 
 **生命周期原则**:
 
-- `onInit()`:只读配置、做准备,**禁止注册监听器或启动线程**
+- `onInit()`:只读配置、做准备, **禁止注册监听器或启动线程**
 - `onStart()`:业务启动,此时可安全调用 `context.getExtensions(...)`
 - `onStop()`:释放可重新获取的资源
 - `onDestroy()`:解除所有强引用,确保 ClassLoader 可被 GC
 
-**插件配置**:框架会自动读取插件工作目录(`pluginsDir/<pluginId>/`)下的 `config.properties` 文件,通过
+**插件配置**:框架会自动读取插件工作目录 (`pluginsDir/<pluginId>/`)下的 `config.properties` 文件,通过
 `PluginContext.getProperty(key)` 访问
 
 ### 3.5 实现扩展
@@ -400,7 +400,7 @@ JAR，放入 `demo-plugins/target/plugins/`。各插件通过 `includes` 模式�
 
 ## 四、高级特性
 
-### 4.1 热重载(Hot Reload)
+### 4.1 热重载 (Hot Reload)
 
 在不重启宿主的前提下替换插件:
 
@@ -436,9 +436,9 @@ reloadPlugin("com.example.plugin.hello",newJar);
 
 依赖插件的 ClassLoader 会自动加入被依赖插件的 ClassLoader 查找链,因此被依赖插件的类对依赖方可见
 
-### 4.3 权限控制(PluginContext 网关拦截)
+### 4.3 权限控制 (PluginContext 网关拦截)
 
-由于 Java 21 已移除 `SecurityManager`,Sunsen 采用**网关拦截模式**:
+由于 Java 21 已移除 `SecurityManager`,Sunsen 采用 **网关拦截模式**:
 
 ```java
 public class SecurePluginContext extends DefaultPluginContext {
@@ -460,7 +460,7 @@ public class SecurePluginContext extends DefaultPluginContext {
 ```
 
 自定义 `PluginContext` 后,需在创建 `DefaultPluginManager` 时通过继承并重写 `loadSinglePlugin` 中 `DefaultPluginContext`
-的构造逻辑来替换(当前版本标准入口为内部方法,建议通过继承 `DefaultPluginManager` 并重写相关方法实现)
+的构造逻辑来替换 (当前版本标准入口为内部方法,建议通过继承 `DefaultPluginManager` 并重写相关方法实现)
 
 ### 4.4 与 Spring Boot 集成思路
 
@@ -499,7 +499,7 @@ public class SunsenConfig {
 
 ## 五、API 速查
 
-### PluginManager(宿主侧)
+### PluginManager (宿主侧)
 
 | 方法                             | 说明                     |
 |--------------------------------|------------------------|
@@ -513,9 +513,9 @@ public class SunsenConfig {
 | `subscribe / unsubscribe`      | 事件监听                   |
 | `setExtensionRegistrar`        | 设置扩展生命周期钩子             |
 
-### PluginContext(插件侧)
+### PluginContext (插件侧)
 
-| 方法                                 | 说明                           |
+| 方法                               | 说明                           |
 |------------------------------------|------------------------------|
 | `getDescriptor()`                  | 获取本插件元数据(record 类型)          |
 | `getPluginWorkDir()`               | 获取插件专属工作目录                   |
@@ -558,7 +558,7 @@ demo-host  ──依赖→  sunsen-server
 demo-plugins ──依赖→ sunsen-api
 ```
 
-宿主和插件**互不依赖**，共同依赖 `demo-api` 契约包。
+宿主和插件 **互不依赖**，共同依赖 `demo-api` 契约包。
 
 ### 运行测试
 
@@ -584,7 +584,7 @@ mvn exec:java -pl sunsen-demo-plain/demo-host
 
 **Q2:插件能不能热重载后回滚到旧版本？**
 
-框架本身不自动回滚。若热重载失败(新 JAR 解析错误、类加载失败等),旧扩展已被注销。宿主可通过监听 `PluginFailedEvent`
+框架本身不自动回滚。若热重载失败 (新 JAR 解析错误、类加载失败等),旧扩展已被注销。宿主可通过监听 `PluginFailedEvent`
 捕获异常,手动决策是否再次 `reloadPlugin` 回退到旧 JAR
 
 **Q3:插件能否访问其他插件的私有类？**

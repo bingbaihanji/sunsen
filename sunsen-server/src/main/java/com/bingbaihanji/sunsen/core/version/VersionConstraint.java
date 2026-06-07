@@ -13,7 +13,8 @@ import java.util.regex.Pattern;
  *   <li>近似版本:{@code ~1.2.0}(等价于 {@code >=1.2.0 <1.3.0})</li>
  *   <li>精确版本:{@code 1.2.0}(等价于 {@code =1.2.0})</li>
  * </ul>
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public final class VersionConstraint {

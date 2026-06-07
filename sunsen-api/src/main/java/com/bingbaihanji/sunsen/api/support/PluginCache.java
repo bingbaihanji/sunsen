@@ -30,7 +30,7 @@ import java.util.function.Function;
  *
  * @param <K> 键类型
  * @param <V> 值类型
-  * @author 冰白寒祭
+ * @author 冰白寒祭
  * @date 2025
  */
 public final class PluginCache<K, V> implements AutoCloseable {

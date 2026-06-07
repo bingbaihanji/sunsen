@@ -6,21 +6,9 @@ import com.bingbaihanji.sunsen.api.PluginManager;
 import com.bingbaihanji.sunsen.api.PluginState;
 
 import java.io.IOException;
-import java.nio.file.ClosedWatchServiceException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchEvent;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
+import java.nio.file.*;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 /**
  * 插件目录文件监听器.
@@ -51,7 +39,8 @@ import java.util.concurrent.TimeUnit;
  *
  * <p><b>线程模型</b>:监听线程是 Daemon 线程,不阻止 JVM 退出.
  * 事件处理在单独的调度线程中执行,与监听线程解耦.
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public class PluginWatcher implements AutoCloseable {

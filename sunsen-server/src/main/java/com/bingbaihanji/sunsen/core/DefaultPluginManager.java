@@ -1,25 +1,9 @@
 package com.bingbaihanji.sunsen.core;
 
-import com.bingbaihanji.sunsen.api.DependencyDescriptor;
-import com.bingbaihanji.sunsen.api.ExtensionInfo;
-import com.bingbaihanji.sunsen.api.ExtensionRegistrar;
-import com.bingbaihanji.sunsen.api.Plugin;
-import com.bingbaihanji.sunsen.api.PluginDescriptor;
-import com.bingbaihanji.sunsen.api.PluginLoadError;
-import com.bingbaihanji.sunsen.api.PluginLoadException;
-import com.bingbaihanji.sunsen.api.PluginManager;
-import com.bingbaihanji.sunsen.api.PluginState;
-import com.bingbaihanji.sunsen.api.SunsenVersion;
+import com.bingbaihanji.sunsen.api.*;
 import com.bingbaihanji.sunsen.api.event.PluginEvent;
 import com.bingbaihanji.sunsen.api.event.PluginEventListener;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginFailedEvent;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginInstalledEvent;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginLoadedEvent;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginReloadedEvent;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginStartedEvent;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginStoppedEvent;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginUninstalledEvent;
-import com.bingbaihanji.sunsen.api.event.builtin.PluginUnloadedEvent;
+import com.bingbaihanji.sunsen.api.event.builtin.*;
 import com.bingbaihanji.sunsen.core.lifecycle.LifecycleStateMachine;
 import com.bingbaihanji.sunsen.core.version.SemVer;
 
@@ -29,12 +13,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -43,7 +22,8 @@ import java.util.concurrent.locks.ReentrantLock;
  * <p>
  * 负责插件的批量/单例加载,启动,停止,卸载与热重载,整合扩展注册表,事件总线,
  * 依赖解析器与生命周期状态机,提供完整的插件生命周期管理能力
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public class DefaultPluginManager implements PluginManager {

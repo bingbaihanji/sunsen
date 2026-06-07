@@ -9,7 +9,8 @@ import java.util.Optional;
 
 /**
  * 插件管理器接口
-  * @author 冰白寒祭
+ *
+ * @author 冰白寒祭
  * @date 2025
  */
 public interface PluginManager extends AutoCloseable {
