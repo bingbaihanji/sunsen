@@ -39,7 +39,10 @@ public interface PluginManager extends AutoCloseable {
     void stopPlugins();
 
     /**
-     * 批量卸载所有 STOPPED 状态的插件,释放 ClassLoader
+     * 批量停止并卸载所有插件,释放 ClassLoader.
+     * 对 ACTIVE 状态的插件先执行 stop 再 unload;
+     * 对已 STOPPED 或 FAILED 的插件直接 unload.
+     * 按拓扑逆序执行,确保被依赖的插件最后卸载.
      */
     void unloadPlugins();
 
