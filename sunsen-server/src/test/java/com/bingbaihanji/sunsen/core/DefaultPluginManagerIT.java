@@ -40,6 +40,10 @@ public class DefaultPluginManagerIT {
      * World 测试插件 JAR 路径
      */
     static Path worldJar;
+    /**
+     * Broken 测试插件 JAR 路径
+     */
+    static Path brokenJar;
 
     DefaultPluginManager manager;
 
@@ -51,6 +55,7 @@ public class DefaultPluginManagerIT {
         Path srcDir = Path.of("src/test/resources/test-plugins");
         helloJar = TestPluginPackager.packagePlugin(srcDir.resolve("plugin-hello"), fixtureDir);
         worldJar = TestPluginPackager.packagePlugin(srcDir.resolve("plugin-world"), fixtureDir);
+        brokenJar = TestPluginPackager.packagePlugin(srcDir.resolve("plugin-broken"), fixtureDir);
     }
 
     @AfterEach
@@ -146,5 +151,127 @@ public class DefaultPluginManagerIT {
         manager.setPluginsDir(pluginsDir);
 
         assertThrows(CircularDependencyException.class, manager::loadPlugins);
+    }
+
+    @Test
+    void testInstallPlugin() throws Exception {
+        manager = new DefaultPluginManager();
+        manager.setPluginsDir(pluginsDir);
+
+        Path externalJar = tempDir.resolve("external-plugins").resolve("plugin-external.jar");
+        Files.createDirectories(externalJar.getParent());
+        Files.copy(helloJar, externalJar);
+
+        manager.installPlugin(externalJar);
+
+        Path installedPath = pluginsDir.resolve("plugin-external.jar");
+        assertTrue(Files.exists(installedPath));
+        assertEquals(PluginState.ACTIVE, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
+    }
+
+    @Test
+    void testInstallPluginSourceNotExist() {
+        manager = new DefaultPluginManager();
+        manager.setPluginsDir(pluginsDir);
+
+        Path nonexistent = tempDir.resolve("nonexistent.jar");
+        assertThrows(PluginLoadException.class, () -> manager.installPlugin(nonexistent));
+        assertFalse(manager.getPlugin("com.bingbaihanji.sunsen.core.test.hello").isPresent());
+    }
+
+    @Test
+    void testInstallRollbackOnStartFailure() throws Exception {
+        manager = new DefaultPluginManager();
+        manager.setPluginsDir(pluginsDir);
+
+        Path externalJar = tempDir.resolve("staging").resolve("plugin-external.jar");
+        Files.createDirectories(externalJar.getParent());
+        Files.copy(brokenJar, externalJar);
+
+        assertThrows(PluginLoadException.class, () -> manager.installPlugin(externalJar));
+
+        Path copiedPath = pluginsDir.resolve("plugin-external.jar");
+        assertFalse(Files.exists(copiedPath), "copied JAR should be cleaned on failure");
+        assertFalse(manager.getPlugin("com.bingbaihanji.sunsen.core.test.hello").isPresent());
+    }
+
+    @Test
+    void testUninstallPlugin() throws Exception {
+        manager = new DefaultPluginManager();
+        manager.setPluginsDir(pluginsDir);
+
+        Path jarInDir = pluginsDir.resolve("plugin-hello.jar");
+        assertTrue(Files.exists(jarInDir));
+
+        manager.loadPlugin(jarInDir);
+        manager.startPlugin("com.bingbaihanji.sunsen.core.test.hello");
+        assertEquals(PluginState.ACTIVE, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
+
+        manager.uninstallPlugin("com.bingbaihanji.sunsen.core.test.hello");
+
+        assertFalse(Files.exists(jarInDir), "JAR file should be deleted");
+        assertFalse(manager.getPlugin("com.bingbaihanji.sunsen.core.test.hello").isPresent());
+    }
+
+    @Test
+    void testLoadPluginsWithResult() throws Exception {
+        manager = new DefaultPluginManager();
+        manager.setPluginsDir(pluginsDir);
+
+        Path corrupted = pluginsDir.resolve("corrupted.jar");
+        Files.write(corrupted, new byte[]{0, 1, 2, 3});
+
+        var errors = manager.loadPluginsWithResult();
+        assertFalse(errors.isEmpty(), "should have at least one error for the corrupted JAR");
+        assertEquals(2, manager.getPlugins().size(), "two valid plugins should still load");
+        assertEquals(PluginState.LOADED, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
+        assertEquals(PluginState.LOADED, manager.getPluginState("com.bingbaihanji.sunsen.core.test.world"));
+    }
+
+    @Test
+    void testReloadPluginWithRollback() throws Exception {
+        manager = new DefaultPluginManager();
+        manager.setPluginsDir(pluginsDir);
+
+        Path jarFile = pluginsDir.resolve("plugin-hello.jar");
+        manager.loadPlugin(jarFile);
+        manager.startPlugin("com.bingbaihanji.sunsen.core.test.hello");
+        assertEquals(PluginState.ACTIVE, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
+
+        assertThrows(PluginLoadException.class,
+                () -> manager.reloadPlugin("com.bingbaihanji.sunsen.core.test.hello", brokenJar));
+
+        assertEquals(PluginState.ACTIVE, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
+        assertTrue(manager.getPlugin("com.bingbaihanji.sunsen.core.test.hello").isPresent());
+    }
+
+    @Test
+    void testConcurrentWaveLoading() {
+        manager = new DefaultPluginManager();
+        manager.setPluginsDir(pluginsDir);
+
+        manager.loadPlugins();
+        assertEquals(2, manager.getPlugins().size());
+        assertEquals(PluginState.LOADED, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
+        assertEquals(PluginState.LOADED, manager.getPluginState("com.bingbaihanji.sunsen.core.test.world"));
+    }
+
+    @Test
+    void testStopAndRestartCycle() {
+        manager = new DefaultPluginManager();
+        manager.setPluginsDir(pluginsDir);
+
+        manager.loadPlugins();
+        manager.startPlugins();
+        assertEquals(PluginState.ACTIVE, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
+
+        manager.stopPlugins();
+        assertEquals(PluginState.STOPPED, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
+
+        manager.startPlugin("com.bingbaihanji.sunsen.core.test.hello");
+        assertEquals(PluginState.ACTIVE, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
+
+        List<GreetingExtension> ext = manager.getExtensions(GreetingExtension.class);
+        assertFalse(ext.isEmpty());
     }
 }
