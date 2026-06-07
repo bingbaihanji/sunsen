@@ -31,7 +31,7 @@ public class DefaultPluginContext implements PluginContext {
     // 插件专属工作目录
     private final Path pluginWorkDir;
     // 插件配置属性
-    private final Properties configProperties = new Properties();
+    private volatile Properties configProperties = new Properties();
     // 本上下文注册的事件订阅列表
     private final List<Subscription<?>> subscriptions = new CopyOnWriteArrayList<>();
     // 插件专属线程组,卸载时统一 interrupt
@@ -59,11 +59,6 @@ public class DefaultPluginContext implements PluginContext {
         this.pluginManager = pluginManager;
         this.pluginWorkDir = pluginWorkDir;
         this.threadGroup = threadGroup;
-        loadConfig();
-    }
-
-    // 加载配置文件
-    private void loadConfig() {
         Path configFile = pluginWorkDir.resolve("config.properties");
         if (Files.exists(configFile)) {
             try (InputStream is = Files.newInputStream(configFile)) {
@@ -85,19 +80,27 @@ public class DefaultPluginContext implements PluginContext {
     }
 
     @Override
-    public String getProperty(String key) {
+    public synchronized String getProperty(String key) {
         return configProperties.getProperty(key);
     }
 
     @Override
-    public String getProperty(String key, String defaultValue) {
+    public synchronized String getProperty(String key, String defaultValue) {
         return configProperties.getProperty(key, defaultValue);
     }
 
     @Override
-    public void reloadConfig() {
-        configProperties.clear();
-        loadConfig();
+    public synchronized void reloadConfig() {
+        Properties fresh = new Properties();
+        Path configFile = pluginWorkDir.resolve("config.properties");
+        if (Files.exists(configFile)) {
+            try (InputStream is = Files.newInputStream(configFile)) {
+                fresh.load(is);
+            } catch (IOException e) {
+                throw new PluginLoadException("Failed to load plugin config: " + configFile, e);
+            }
+        }
+        configProperties = fresh;
     }
 
     @Override
