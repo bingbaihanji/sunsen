@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -149,7 +150,7 @@ public class DefaultPluginContext implements PluginContext {
 
     @Override
     public PluginManager getPluginManager() {
-        return new PluginManagerView(pluginManager);
+        return createManagerView();
     }
 
     @Override
@@ -172,135 +173,50 @@ public class DefaultPluginContext implements PluginContext {
     private record Subscription<T extends PluginEvent>(Class<T> eventType, PluginEventListener<T> listener) {
     }
 
-    /**
-     * PluginManager 的安全视图,限制插件只能执行查询操作,
-     * 禁止直接加载/卸载/启动/停止/热重载其他插件.
-     * 事件发布与订阅路由到外层 {@link DefaultPluginContext},
-     * 以保证 sourcePluginId 校验和自动取消订阅语义.
-     */
-    private class PluginManagerView implements PluginManager {
+    private static final Set<String> ALLOWED_METHODS = Set.of(
+            "getPlugin", "getPlugins", "getPluginState", "isPluginActive",
+            "getExtensions", "getExtension", "getExtensionInfos",
+            "publishEvent", "subscribe", "unsubscribe", "close"
+    );
 
-        private final PluginManager delegate;
-
-        PluginManagerView(PluginManager delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public void loadPlugins() {
-            throw new PluginPermissionException("Plugin cannot invoke loadPlugins via PluginContext");
-        }
-
-        @Override
-        public List<PluginLoadError> loadPluginsWithResult() {
-            throw new PluginPermissionException("Plugin cannot invoke loadPluginsWithResult via PluginContext");
-        }
-
-        @Override
-        public void startPlugins() {
-            throw new PluginPermissionException("Plugin cannot invoke startPlugins via PluginContext");
-        }
-
-        @Override
-        public void stopPlugins() {
-            throw new PluginPermissionException("Plugin cannot invoke stopPlugins via PluginContext");
-        }
-
-        @Override
-        public void unloadPlugins() {
-            throw new PluginPermissionException("Plugin cannot invoke unloadPlugins via PluginContext");
-        }
-
-        @Override
-        public PluginDescriptor loadPlugin(Path jarPath) {
-            throw new PluginPermissionException("Plugin cannot invoke loadPlugin via PluginContext");
-        }
-
-        @Override
-        public void startPlugin(String pluginId) {
-            throw new PluginPermissionException("Plugin cannot invoke startPlugin via PluginContext");
-        }
-
-        @Override
-        public void stopPlugin(String pluginId) {
-            throw new PluginPermissionException("Plugin cannot invoke stopPlugin via PluginContext");
-        }
-
-        @Override
-        public void unloadPlugin(String pluginId) {
-            throw new PluginPermissionException("Plugin cannot invoke unloadPlugin via PluginContext");
-        }
-
-        @Override
-        public void reloadPlugin(String pluginId, Path newJarPath) {
-            throw new PluginPermissionException("Plugin cannot invoke reloadPlugin via PluginContext");
-        }
-
-        @Override
-        public void reloadPlugin(String pluginId) {
-            throw new PluginPermissionException("Plugin cannot invoke reloadPlugin via PluginContext");
-        }
-
-        @Override
-        public void installPlugin(Path source) {
-            throw new PluginPermissionException("Plugin cannot invoke installPlugin via PluginContext");
-        }
-
-        @Override
-        public void uninstallPlugin(String pluginId) {
-            throw new PluginPermissionException("Plugin cannot invoke uninstallPlugin via PluginContext");
-        }
-
-        @Override
-        public <T> List<ExtensionInfo> getExtensionInfos(Class<T> extensionPoint) {
-            return delegate.getExtensionInfos(extensionPoint);
-        }
-
-        @Override
-        public Optional<PluginDescriptor> getPlugin(String pluginId) {
-            return delegate.getPlugin(pluginId);
-        }
-
-        @Override
-        public List<PluginDescriptor> getPlugins() {
-            return delegate.getPlugins();
-        }
-
-        @Override
-        public PluginState getPluginState(String pluginId) {
-            return delegate.getPluginState(pluginId);
-        }
-
-        @Override
-        public <T> List<T> getExtensions(Class<T> extensionPoint) {
-            return delegate.getExtensions(extensionPoint);
-        }
-
-        @Override
-        public <T> Optional<T> getExtension(Class<T> extensionPoint, String extensionId) {
-            return delegate.getExtension(extensionPoint, extensionId);
-        }
-
-        @Override
-        public void publishEvent(PluginEvent event) {
-            // Route through context to enforce sourcePluginId == descriptor.id()
-            DefaultPluginContext.this.publishEvent(event);
-        }
-
-        @Override
-        public <T extends PluginEvent> void subscribe(Class<T> eventType, PluginEventListener<T> listener) {
-            // Route through context so the subscription is tracked and auto-cleaned on unload
-            DefaultPluginContext.this.subscribe(eventType, listener);
-        }
-
-        @Override
-        public <T extends PluginEvent> void unsubscribe(Class<T> eventType, PluginEventListener<T> listener) {
-            DefaultPluginContext.this.unsubscribe(eventType, listener);
-        }
-
-        @Override
-        public void setExtensionRegistrar(ExtensionRegistrar registrar) {
-            throw new PluginPermissionException("Plugin cannot invoke setExtensionRegistrar via PluginContext");
-        }
+    @SuppressWarnings("unchecked")
+    private PluginManager createManagerView() {
+        final PluginManager delegate = pluginManager;
+        final DefaultPluginContext context = this;
+        return (PluginManager) java.lang.reflect.Proxy.newProxyInstance(
+                PluginManager.class.getClassLoader(),
+                new Class<?>[]{PluginManager.class},
+                (proxy, method, args) -> {
+                    String name = method.getName();
+                    if (!ALLOWED_METHODS.contains(name)) {
+                        throw new PluginPermissionException(
+                                "Plugin cannot invoke " + name + " via PluginContext");
+                    }
+                    return switch (name) {
+                        case "publishEvent" -> {
+                            context.publishEvent((PluginEvent) args[0]);
+                            yield null;
+                        }
+                        case "subscribe" -> {
+                            @SuppressWarnings("rawtypes")
+                            Class rawType = (Class) args[0];
+                            @SuppressWarnings("rawtypes")
+                            PluginEventListener rawListener = (PluginEventListener) args[1];
+                            context.subscribe(rawType, rawListener);
+                            yield null;
+                        }
+                        case "unsubscribe" -> {
+                            @SuppressWarnings("rawtypes")
+                            Class rawType = (Class) args[0];
+                            @SuppressWarnings("rawtypes")
+                            PluginEventListener rawListener = (PluginEventListener) args[1];
+                            context.unsubscribe(rawType, rawListener);
+                            yield null;
+                        }
+                        case "close" -> null;
+                        default -> method.invoke(delegate, args);
+                    };
+                }
+        );
     }
 }
