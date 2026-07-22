@@ -60,7 +60,9 @@ public class PluginEventBus {
 
     public <T extends PluginEvent> void unsubscribe(Class<T> eventType, PluginEventListener<T> listener) {
         CopyOnWriteArrayList<Subscription<?>> list = listeners.get(eventType);
-        if (list == null) return;
+        if (list == null) {
+            return;
+        }
         list.removeIf(sub -> sub.listener == listener);
     }
 

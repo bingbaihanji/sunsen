@@ -21,8 +21,12 @@ public record DependencyDescriptor(String id, String versionConstraint, boolean 
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         DependencyDescriptor that = (DependencyDescriptor) o;
         return optional == that.optional && id.equals(that.id) && versionConstraint.equals(that.versionConstraint);
     }

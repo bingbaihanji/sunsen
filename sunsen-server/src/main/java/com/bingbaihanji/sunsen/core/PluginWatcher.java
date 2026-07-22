@@ -135,11 +135,15 @@ public class PluginWatcher implements AutoCloseable {
             }
             for (WatchEvent<?> event : key.pollEvents()) {
                 WatchEvent.Kind<?> kind = event.kind();
-                if (kind == StandardWatchEventKinds.OVERFLOW) continue;
+                if (kind == StandardWatchEventKinds.OVERFLOW) {
+                    continue;
+                }
 
                 @SuppressWarnings("unchecked")
                 Path fileName = ((WatchEvent<Path>) event).context();
-                if (!fileName.toString().endsWith(".jar")) continue;
+                if (!fileName.toString().endsWith(".jar")) {
+                    continue;
+                }
 
                 Path fullPath = pluginsDir.resolve(fileName).toAbsolutePath().normalize();
 
@@ -178,7 +182,9 @@ public class PluginWatcher implements AutoCloseable {
     }
 
     private void handleCreateOrModify(Path jar) {
-        if (!Files.exists(jar)) return;
+        if (!Files.exists(jar)) {
+            return;
+        }
 
         PluginDescriptor desc;
         try {
@@ -221,10 +227,14 @@ public class PluginWatcher implements AutoCloseable {
 
     private void handleDelete(Path jar) {
         String pluginId = jarToPluginId.remove(jar);
-        if (pluginId == null) return;
+        if (pluginId == null) {
+            return;
+        }
 
         PluginState state = manager.getPluginState(pluginId);
-        if (state == null || state == PluginState.UNLOADED) return;
+        if (state == null || state == PluginState.UNLOADED) {
+            return;
+        }
 
         debounceExecutor.submit(() -> {
             try {

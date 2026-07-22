@@ -67,7 +67,9 @@ public final class VersionConstraint {
         String[] parts = expr.split("\\s+");
         for (String part : parts) {
             part = part.trim();
-            if (part.isEmpty()) continue;
+            if (part.isEmpty()) {
+                continue;
+            }
             predicates.add(parsePredicate(part));
         }
         return new VersionConstraint(predicates);

@@ -133,10 +133,10 @@ public final class PluginProperties {
             return defaultValue;
         }
         String trimmed = value.trim();
-        if (trimmed.equalsIgnoreCase("true")) {
+        if ("true".equalsIgnoreCase(trimmed)) {
             return true;
         }
-        if (trimmed.equalsIgnoreCase("false")) {
+        if ("false".equalsIgnoreCase(trimmed)) {
             return false;
         }
         return defaultValue;

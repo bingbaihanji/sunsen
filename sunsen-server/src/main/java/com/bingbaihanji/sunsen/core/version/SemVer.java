@@ -91,9 +91,13 @@ public record SemVer(
     @Override
     public int compareTo(SemVer other) {
         int cmp = Integer.compare(this.major, other.major);
-        if (cmp != 0) return cmp;
+        if (cmp != 0) {
+            return cmp;
+        }
         cmp = Integer.compare(this.minor, other.minor);
-        if (cmp != 0) return cmp;
+        if (cmp != 0) {
+            return cmp;
+        }
         return Integer.compare(this.patch, other.patch);
     }
 

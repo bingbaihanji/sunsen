@@ -421,7 +421,9 @@ public class DefaultPluginManager implements PluginManager {
 
             // Check if other plugins depend on this one
             for (PluginEntry entry : plugins.values()) {
-                if (pluginId.equals(entry.descriptor().id())) continue;
+                if (pluginId.equals(entry.descriptor().id())) {
+                    continue;
+                }
                 for (DependencyDescriptor dep : entry.descriptor().dependencies()) {
                     if (pluginId.equals(dep.id())) {
                         throw new PluginLoadException(
@@ -487,7 +489,9 @@ public class DefaultPluginManager implements PluginManager {
 
             // Phase 4: update ClassLoader references for plugins that depend on the reloaded one
             for (PluginEntry entry : plugins.values()) {
-                if (pluginId.equals(entry.descriptor().id())) continue;
+                if (pluginId.equals(entry.descriptor().id())) {
+                    continue;
+                }
                 boolean dependsOnReloaded = entry.descriptor().dependencies().stream()
                         .anyMatch(dep -> pluginId.equals(dep.id()));
                 if (dependsOnReloaded) {
@@ -682,7 +686,9 @@ public class DefaultPluginManager implements PluginManager {
     private void rebuildTopology() {
         List<PluginDescriptor> current = new ArrayList<>(getPlugins());
         topology.clear();
-        if (current.isEmpty()) return;
+        if (current.isEmpty()) {
+            return;
+        }
         for (PluginDescriptor d : dependencyResolver.sort(current)) {
             topology.add(d.id());
         }
@@ -780,7 +786,9 @@ public class DefaultPluginManager implements PluginManager {
 
     private void startSinglePlugin(String pluginId) {
         PluginEntry entry = plugins.get(pluginId);
-        if (entry == null) return;
+        if (entry == null) {
+            return;
+        }
 
         // LOADED(首次)和 STOPPED(重启)都可以进入 STARTING
         PluginState current = stateMachine.getState(pluginId);
@@ -795,7 +803,9 @@ public class DefaultPluginManager implements PluginManager {
 
     private void stopSinglePlugin(String pluginId) {
         PluginEntry entry = plugins.get(pluginId);
-        if (entry == null) return;
+        if (entry == null) {
+            return;
+        }
 
         stateMachine.transition(pluginId, PluginState.ACTIVE, PluginState.STOPPING);
         stateMachine.executePhase(entry.plugin()::onStop, entry.descriptor(), PluginState.STOPPING);
@@ -816,7 +826,9 @@ public class DefaultPluginManager implements PluginManager {
      */
     private PluginDescriptor doUnloadSinglePlugin(String pluginId) {
         PluginEntry entry = plugins.get(pluginId);
-        if (entry == null) return null;
+        if (entry == null) {
+            return null;
+        }
 
         // 1. invoke onDestroy callback (plugin still visible, safe to access its own extensions)
         try {

@@ -185,12 +185,16 @@ public class PluginDescriptorProcessor extends AbstractProcessor {
                 int fieldCount = 0;
                 for (Plugin.Vendor vendor : vendors) {
                     if (!vendor.name().isBlank()) {
-                        if (fieldCount > 0) sb.append(",\n");
+                        if (fieldCount > 0) {
+                            sb.append(",\n");
+                        }
                         sb.append("    \"name\": \"").append(escapeJson(vendor.name())).append("\"");
                         fieldCount++;
                     }
                     if (!vendor.url().isBlank()) {
-                        if (fieldCount > 0) sb.append(",\n");
+                        if (fieldCount > 0) {
+                            sb.append(",\n");
+                        }
                         sb.append("    \"url\": \"").append(escapeJson(vendor.url())).append("\"");
                         fieldCount++;
                     }

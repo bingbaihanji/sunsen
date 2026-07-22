@@ -51,7 +51,9 @@ public class ExtensionScanner {
         stack.push(clazz);
         while (!stack.isEmpty()) {
             Class<?> current = stack.pop();
-            if (current == Object.class) continue;
+            if (current == Object.class) {
+                continue;
+            }
             for (Class<?> iface : current.getInterfaces()) {
                 if (result.add(iface)) {
                     stack.push(iface);
@@ -74,18 +76,26 @@ public class ExtensionScanner {
     public void scan(PluginDescriptor descriptor, PluginClassLoader classLoader) {
         List<Class<?>> extensionClasses = new ArrayList<>();
         for (URL url : classLoader.getURLs()) {
-            if (!"file".equals(url.getProtocol())) continue;
+            if (!"file".equals(url.getProtocol())) {
+                continue;
+            }
             try {
                 Path jarPath = Path.of(url.toURI());
-                if (!Files.exists(jarPath)) continue;
+                if (!Files.exists(jarPath)) {
+                    continue;
+                }
                 try (JarFile jarFile = new JarFile(jarPath.toFile())) {
                     Enumeration<JarEntry> entries = jarFile.entries();
                     while (entries.hasMoreElements()) {
                         JarEntry entry = entries.nextElement();
                         String name = entry.getName();
-                        if (!name.endsWith(".class")) continue;
+                        if (!name.endsWith(".class")) {
+                            continue;
+                        }
                         String className = name.replace('/', '.').substring(0, name.length() - 6);
-                        if (!belongsToPlugin(className, descriptor.packagePrefixes())) continue;
+                        if (!belongsToPlugin(className, descriptor.packagePrefixes())) {
+                            continue;
+                        }
                         try {
                             // 使用 initialize=false 避免触发静态初始化器
                             Class<?> clazz = Class.forName(className, false, classLoader);
@@ -163,7 +173,9 @@ public class ExtensionScanner {
     void validateSingleExtensions(Map<Class<?>, List<Class<?>>> extensionMap) {
         for (Map.Entry<Class<?>, List<Class<?>>> entry : extensionMap.entrySet()) {
             List<Class<?>> impls = entry.getValue();
-            if (impls.size() <= 1) continue;
+            if (impls.size() <= 1) {
+                continue;
+            }
             Class<?> epType = entry.getKey();
             ExtensionPoint ep = epType.getAnnotation(ExtensionPoint.class);
             if (ep != null && !ep.allowMultiple()) {

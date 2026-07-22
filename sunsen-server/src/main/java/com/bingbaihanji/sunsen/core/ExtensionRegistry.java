@@ -39,7 +39,9 @@ public class ExtensionRegistry {
     private static void insertSortedByOrder(List<ExtensionEntry<?>> list, ExtensionEntry<?> entry) {
         int index = 0;
         for (; index < list.size(); index++) {
-            if (list.get(index).order() > entry.order()) break;
+            if (list.get(index).order() > entry.order()) {
+                break;
+            }
         }
         list.add(index, entry);
     }
@@ -217,7 +219,9 @@ public class ExtensionRegistry {
         lock.readLock().lock();
         try {
             List<ExtensionEntry<?>> list = entries.get(extensionPointType.getName());
-            if (list == null) return Optional.empty();
+            if (list == null) {
+                return Optional.empty();
+            }
             for (ExtensionEntry<?> entry : list) {
                 if (entry.extensionId().equals(extensionId)) {
                     return Optional.of((T) entry.getInstance());

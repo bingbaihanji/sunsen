@@ -49,7 +49,9 @@ public class DependencyResolver {
         }
         for (PluginDescriptor d : all) {
             for (DependencyDescriptor dep : d.dependencies()) {
-                if (!idMap.containsKey(dep.id())) continue; // optional 缺失
+                if (!idMap.containsKey(dep.id())) {
+                    continue; // optional 缺失
+                }
                 revAdj.get(dep.id()).add(d.id());
                 inDegree.merge(d.id(), 1, Integer::sum);
             }
@@ -100,7 +102,9 @@ public class DependencyResolver {
         for (PluginDescriptor descriptor : all) {
             for (DependencyDescriptor dep : descriptor.dependencies()) {
                 PluginDescriptor target = idMap.get(dep.id());
-                if (target == null) continue; // optional 缺失已在上一步放过
+                if (target == null) {
+                    continue; // optional 缺失已在上一步放过
+                }
                 VersionConstraint constraint = VersionConstraint.parse(dep.versionConstraint());
                 SemVer targetVersion = SemVer.parse(target.version());
                 if (!constraint.matches(targetVersion)) {
@@ -153,10 +157,14 @@ public class DependencyResolver {
             // 正常情况下循环依赖已由 resolve() 中的 detectCycles() 提前拦截;
             // 若单独调用 sort(),此处给出明确错误信息
             Set<String> sorted = new HashSet<>();
-            for (PluginDescriptor d : result) sorted.add(d.id());
+            for (PluginDescriptor d : result) {
+                sorted.add(d.id());
+            }
             List<String> remaining = new ArrayList<>();
             for (PluginDescriptor d : all) {
-                if (!sorted.contains(d.id())) remaining.add(d.id());
+                if (!sorted.contains(d.id())) {
+                    remaining.add(d.id());
+                }
             }
             throw new CircularDependencyException(remaining);
         }
@@ -178,7 +186,9 @@ public class DependencyResolver {
 
         List<String> zeroQueue = new ArrayList<>();
         for (Map.Entry<String, Integer> entry : inDegree.entrySet()) {
-            if (entry.getValue() == 0) zeroQueue.add(entry.getKey());
+            if (entry.getValue() == 0) {
+                zeroQueue.add(entry.getKey());
+            }
         }
 
         List<List<PluginDescriptor>> levels = new ArrayList<>();
@@ -191,7 +201,9 @@ public class DependencyResolver {
                 for (String next : adj.get(id)) {
                     int newDegree = inDegree.get(next) - 1;
                     inDegree.put(next, newDegree);
-                    if (newDegree == 0) nextQueue.add(next);
+                    if (newDegree == 0) {
+                        nextQueue.add(next);
+                    }
                 }
             }
             processed += wave.size();
@@ -202,11 +214,15 @@ public class DependencyResolver {
         if (processed != all.size()) {
             Set<String> sorted = new HashSet<>();
             for (List<PluginDescriptor> wave : levels) {
-                for (PluginDescriptor d : wave) sorted.add(d.id());
+                for (PluginDescriptor d : wave) {
+                    sorted.add(d.id());
+                }
             }
             List<String> remaining = new ArrayList<>();
             for (PluginDescriptor d : all) {
-                if (!sorted.contains(d.id())) remaining.add(d.id());
+                if (!sorted.contains(d.id())) {
+                    remaining.add(d.id());
+                }
             }
             throw new CircularDependencyException(remaining);
         }
@@ -254,8 +270,12 @@ public class DependencyResolver {
                 List<String> cycle = new ArrayList<>();
                 boolean collect = false;
                 for (String id : path.reversed()) {
-                    if (id.equals(neighbor)) collect = true;
-                    if (collect) cycle.add(id);
+                    if (id.equals(neighbor)) {
+                        collect = true;
+                    }
+                    if (collect) {
+                        cycle.add(id);
+                    }
                 }
                 cycle.add(neighbor);
                 throw new CircularDependencyException(cycle);
