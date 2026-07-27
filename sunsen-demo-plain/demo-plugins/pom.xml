@@ -87,6 +87,16 @@
                                        classpath="${plugin.cp}"
                                        includeantruntime="false"
                                        release="21"/>
+                                <mkdir dir="${project.build.directory}/plugin-classes/hello/META-INF"/>
+                                <echo file="${project.build.directory}/plugin-classes/hello/META-INF/plugin.json">{
+  "id": "com.bingbaihanji.sunsen.demo.plain.hello",
+  "name": "Hello Plugin",
+  "version": "1.0.0",
+  "apiVersion": "1.1",
+  "mainClass": "com.bingbaihanji.sunsen.demo.plain.hello.HelloPlugin",
+  "packagePrefixes": ["com.bingbaihanji.sunsen.demo.plain.hello"],
+  "permissions": ["event:subscribe", "event:publish"]
+}</echo>
                                 <jar destfile="${project.build.directory}/plugins/plugin-hello.jar"
                                      basedir="${project.build.directory}/plugin-classes/hello"/>
                                 <!-- Hello 插件配置文件：部署到框架约定的工作目录 -->
@@ -103,6 +113,21 @@
                                        classpath="${plugin.cp}"
                                        includeantruntime="false"
                                        release="21"/>
+                                <mkdir dir="${project.build.directory}/plugin-classes/world/META-INF"/>
+                                <echo file="${project.build.directory}/plugin-classes/world/META-INF/plugin.json">{
+  "id": "com.bingbaihanji.sunsen.demo.plain.world",
+  "name": "World Plugin",
+  "version": "1.0.0",
+  "apiVersion": "1.1",
+  "mainClass": "com.bingbaihanji.sunsen.demo.plain.world.WorldPlugin",
+  "packagePrefixes": ["com.bingbaihanji.sunsen.demo.plain.world"],
+  "dependencies": [
+    {
+      "id": "com.bingbaihanji.sunsen.demo.plain.hello",
+      "version": "&gt;=1.0.0"
+    }
+  ]
+}</echo>
                                 <jar destfile="${project.build.directory}/plugins/plugin-world.jar"
                                      basedir="${project.build.directory}/plugin-classes/world"/>
 
@@ -114,6 +139,16 @@
                                        classpath="${plugin.cp}"
                                        includeantruntime="false"
                                        release="21"/>
+                                <mkdir dir="${project.build.directory}/plugin-classes/scheduler/META-INF"/>
+                                <echo file="${project.build.directory}/plugin-classes/scheduler/META-INF/plugin.json">{
+  "id": "com.bingbaihanji.sunsen.demo.plain.scheduler",
+  "name": "Scheduler Plugin",
+  "version": "1.0.0",
+  "apiVersion": "1.1",
+  "mainClass": "com.bingbaihanji.sunsen.demo.plain.scheduler.SchedulerPlugin",
+  "packagePrefixes": ["com.bingbaihanji.sunsen.demo.plain.scheduler"],
+  "permissions": ["event:publish"]
+}</echo>
                                 <jar destfile="${project.build.directory}/plugins/plugin-scheduler.jar"
                                      basedir="${project.build.directory}/plugin-classes/scheduler"/>
                             </target>

@@ -111,7 +111,7 @@ public record SemVer(
         if (!this.isPreRelease() && other.isPreRelease()) {
             return 1;
         }
-        if (this.isPreRelease() && other.isPreRelease()) {
+        if (this.isPreRelease()) {
             return this.preRelease.compareTo(other.preRelease);
         }
         return 0;

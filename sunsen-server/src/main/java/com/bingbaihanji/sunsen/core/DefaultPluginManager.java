@@ -573,9 +573,7 @@ public class DefaultPluginManager implements PluginManager {
                         LOGGER.log(System.Logger.Level.ERROR,
                                 () -> "Rollback failed for plugin " + pluginId, rollbackEx);
                         stateMachine.forceSet(pluginId, PluginState.FAILED);
-                        if (oldDescriptor != null) {
-                            eventBus.publish(new PluginFailedEvent(oldDescriptor, PluginState.LOADED, rollbackEx));
-                        }
+                        eventBus.publish(new PluginFailedEvent(oldDescriptor, PluginState.LOADED, rollbackEx));
                     }
                 }
                 if (!rolledBack && oldDescriptor != null) {

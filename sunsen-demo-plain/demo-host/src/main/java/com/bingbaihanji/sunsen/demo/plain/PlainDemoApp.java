@@ -129,7 +129,7 @@ public class PlainDemoApp {
     private static Path resolvePluginsDir() {
         // exec-maven-plugin 将工作目录设置为 sunsen-demo-plain/，
         // 所以 "demo-plugins/target/plugins" 是首选路径。
-        Path dir = Path.of("demo-plugins/target/plugins");
+        Path dir = Path.of("D:\\bingbaihanji\\overarching\\Sunsen\\sunsen-demo-plain\\demo-plugins\\target\\plugins");
         if (!Files.exists(dir)) {
             throw new IllegalStateException(
                     "插件目录不存在: " + dir.toAbsolutePath().normalize()

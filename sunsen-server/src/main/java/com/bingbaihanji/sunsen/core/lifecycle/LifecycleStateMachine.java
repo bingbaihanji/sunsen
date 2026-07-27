@@ -138,10 +138,8 @@ public class LifecycleStateMachine {
             if (t instanceof RuntimeException re) {
                 throw re;
             }
-            if (t instanceof Error err) {
-                throw new RuntimeException("插件 " + descriptor.id() + " 生命周期阶段抛出 Error", err);
-            }
-            throw new RuntimeException("插件 " + descriptor.id() + " 生命周期阶段异常", t);
+            Error err = (Error) t;
+            throw new RuntimeException("插件 " + descriptor.id() + " 生命周期阶段抛出 Error", err);
         }
     }
 
