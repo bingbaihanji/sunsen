@@ -94,7 +94,7 @@ mvn exec:java -pl sunsen-demo-plain/demo-host
 6. **热重载原子窗口**：`reloadPlugin()` 在 `ExtensionRegistry` 写锁内完成"卸旧 → 注新"全过程，`getExtensions()` 持读锁，
    不存在"扩展数量为零"的中间窗口。**不要把注销和注册拆到两个独立的锁窗口**。被其他插件依赖的插件禁止热重载
    （抛 `PluginLoadException`）。
-7. **apiVersion 闸门**：插件 `plugin.json` 的 `apiVersion` 必须与 `SunsenVersion.API_VERSION`（当前 `"1.0"`）严格匹配。
+7. **apiVersion 闸门**：插件 `plugin.json` 的 `apiVersion` 只需 major 版本号与 `SunsenVersion.API_VERSION`（当前 `"1.1"`）一致即视为兼容（SemVer major 比较），minor/patch 差异不影响加载。公开 API 的破坏性变更须升 major 版本号。
    公开 API 的破坏性变更须同步升主版本号。
 8. **权限网关**：JDK 21 已移除 `SecurityManager`，框架不依赖 JVM 沙箱。所有插件访问框架能力的入口收敛在
    `PluginContext`；宿主继承 `DefaultPluginContext` 在方法入口检查 `descriptor.permissions()` 实现拦截。新增暴露给插件的

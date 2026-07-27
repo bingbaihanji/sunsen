@@ -8,19 +8,12 @@ import com.bingbaihanji.sunsen.api.event.builtin.PluginStartedEvent;
 import com.bingbaihanji.sunsen.api.event.builtin.PluginStoppedEvent;
 import com.bingbaihanji.sunsen.api.event.builtin.PluginUnloadedEvent;
 import com.bingbaihanji.sunsen.core.DefaultPluginManager;
-import com.bingbaihanji.sunsen.core.PluginWatcher;
 import com.bingbaihanji.sunsen.demo.plain.event.GreetingEvent;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-
-import static java.util.concurrent.TimeUnit.HOURS;
-import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * Sunsen 纯 Java 宿主演示程序
@@ -46,7 +39,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  */
 public class PlainDemoApp {
 
-    final Runnable task = () -> {
+    public static void main(String[] args) {
         Path pluginsDir = resolvePluginsDir();
 
         DefaultPluginManager manager = new DefaultPluginManager();
@@ -130,20 +123,10 @@ public class PlainDemoApp {
         manager.unloadPlugins();
 
         System.out.println("\n=== 演示结束 ===");
-
-        try (PluginWatcher watcher = new PluginWatcher(manager)) {
-            System.out.println("已开启自动检测");
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    };
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
-    public static void main(String[] args) {
-        new PlainDemoApp().loop();
+        manager.close();
     }
 
-    private Path resolvePluginsDir() {
+    private static Path resolvePluginsDir() {
         // exec-maven-plugin 将工作目录设置为 sunsen-demo-plain/，
         // 所以 "demo-plugins/target/plugins" 是首选路径。
         Path dir = Path.of("demo-plugins/target/plugins");
@@ -155,9 +138,4 @@ public class PlainDemoApp {
         return dir.toAbsolutePath().normalize();
     }
 
-    private void loop() {
-        ScheduledFuture<?> handle = scheduler.scheduleAtFixedRate(task, 5, 20, SECONDS);
-        Runnable canceller = () -> handle.cancel(false);
-        scheduler.schedule(canceller, 1, HOURS);
-    }
 }
