@@ -303,8 +303,11 @@ public class DefaultPluginManager implements PluginManager {
                         } catch (Exception e) {
                             waveErrors.add(new PluginLoadError(descriptor.id(), jarPath, e));
                             LOGGER.log(System.Logger.Level.ERROR, () -> "Load plugin failed: " + descriptor.id(), e);
-                            stateMachine.forceSet(descriptor.id(), PluginState.FAILED);
-                            eventBus.publish(new PluginFailedEvent(descriptor, PluginState.CREATED, e));
+                            // 仅当状态机尚未置为 FAILED 时发布事件(executePhase 已处理的场合避免重复)
+                            if (stateMachine.getState(descriptor.id()) != PluginState.FAILED) {
+                                stateMachine.forceSet(descriptor.id(), PluginState.FAILED);
+                                eventBus.publish(new PluginFailedEvent(descriptor, PluginState.CREATED, e));
+                            }
                         }
                     });
                     waveThreads.add(t);
@@ -465,7 +468,7 @@ public class DefaultPluginManager implements PluginManager {
     public void unloadPlugin(String pluginId) {
         PluginEntry entry = plugins.get(pluginId);
         if (entry == null) {
-            throw new PluginLoadException("Plugin does not exist: " + pluginId);
+            throw new PluginLoadException("插件不存在: " + pluginId);
         }
 
         managementLock.lock();
@@ -506,7 +509,7 @@ public class DefaultPluginManager implements PluginManager {
             // Re-check shared state inside lock to avoid TOCTOU race
             PluginEntry oldEntry = plugins.get(pluginId);
             if (oldEntry == null) {
-                throw new PluginLoadException("Plugin does not exist, cannot reload: " + pluginId);
+                throw new PluginLoadException("插件不存在, cannot reload: " + pluginId);
             }
 
             // Prefix conflict check (exclude old plugin)
@@ -636,7 +639,7 @@ public class DefaultPluginManager implements PluginManager {
     public void reloadPlugin(String pluginId) {
         PluginEntry entry = plugins.get(pluginId);
         if (entry == null) {
-            throw new PluginLoadException("Plugin does not exist, cannot reload: " + pluginId);
+            throw new PluginLoadException("插件不存在, cannot reload: " + pluginId);
         }
         reloadPlugin(pluginId, entry.jarPath());
     }
@@ -687,7 +690,7 @@ public class DefaultPluginManager implements PluginManager {
     public void uninstallPlugin(String pluginId) {
         PluginEntry entry = plugins.get(pluginId);
         if (entry == null) {
-            throw new PluginLoadException("Plugin does not exist, cannot uninstall: " + pluginId);
+            throw new PluginLoadException("插件不存在, cannot uninstall: " + pluginId);
         }
         PluginDescriptor descriptor = entry.descriptor();
         Path jarPath = entry.jarPath();

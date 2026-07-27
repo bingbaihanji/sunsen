@@ -22,6 +22,8 @@ public class PluginEventBus {
     private final ConcurrentHashMap<Class<?>, CopyOnWriteArrayList<Subscription<?>>> listeners = new ConcurrentHashMap<>();
     // 事件执行器,默认同步执行
     private final Executor executor;
+    // 是否已关闭
+    private volatile boolean closed;
 
     /**
      * 构造默认同步事件总线
@@ -76,6 +78,11 @@ public class PluginEventBus {
     }
 
     public void publish(PluginEvent event) {
+        if (closed) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    () -> "事件总线已关闭,丢弃事件: " + event.getClass().getSimpleName());
+            return;
+        }
         Class<? extends PluginEvent> eventClass = event.getClass();
 
         // 精确类型匹配(最常见路径,O(1))
@@ -97,6 +104,7 @@ public class PluginEventBus {
      * After this call, no new events will be dispatched.
      */
     public void close() {
+        closed = true;
         if (executor instanceof java.util.concurrent.ExecutorService es) {
             es.shutdown();
         }

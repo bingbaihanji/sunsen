@@ -230,28 +230,25 @@ public class DependencyResolver {
     }
 
     /**
-     * 使用 DFS 检测循环依赖
+     * 使用 DFS 检测循环依赖,发现环时立即抛出 CircularDependencyException.
      */
     private void detectCycles(List<PluginDescriptor> all, Map<String, PluginDescriptor> idMap) {
         Map<String, List<String>> adj = buildAdj(all, idMap);
-
         Set<String> visited = new HashSet<>();
         Set<String> recStack = new HashSet<>();
         Deque<String> path = new ArrayDeque<>();
 
         for (String id : adj.keySet()) {
             if (!visited.contains(id)) {
-                if (dfs(id, adj, visited, recStack, path)) {
-                    return; // 异常已在 dfs 中抛出
-                }
+                dfs(id, adj, visited, recStack, path);
             }
         }
     }
 
     /**
-     * 深度优先搜索,发现环时立即抛出异常
+     * 深度优先搜索,发现环时立即抛出异常.
      */
-    private boolean dfs(String node,
+    private void dfs(String node,
                         Map<String, List<String>> adj,
                         Set<String> visited,
                         Set<String> recStack,
@@ -262,9 +259,7 @@ public class DependencyResolver {
 
         for (String neighbor : adj.getOrDefault(node, List.of())) {
             if (!visited.contains(neighbor)) {
-                if (dfs(neighbor, adj, visited, recStack, path)) {
-                    return true;
-                }
+                dfs(neighbor, adj, visited, recStack, path);
             } else if (recStack.contains(neighbor)) {
                 // 发现环,收集环上节点
                 List<String> cycle = new ArrayList<>();
@@ -284,6 +279,5 @@ public class DependencyResolver {
 
         path.pop();
         recStack.remove(node);
-        return false;
     }
 }

@@ -83,12 +83,12 @@ public class DefaultPluginContext implements PluginContext {
     }
 
     @Override
-    public synchronized String getProperty(String key) {
+    public String getProperty(String key) {
         return configProperties.getProperty(key);
     }
 
     @Override
-    public synchronized String getProperty(String key, String defaultValue) {
+    public String getProperty(String key, String defaultValue) {
         return configProperties.getProperty(key, defaultValue);
     }
 
