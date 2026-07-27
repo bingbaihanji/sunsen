@@ -132,10 +132,16 @@ public class LifecycleStateMachine {
     public void executePhase(Runnable phase, PluginDescriptor descriptor, PluginState failState) {
         try {
             phase.run();
-        } catch (Exception e) {
+        } catch (Throwable t) {
             forceSet(descriptor.id(), PluginState.FAILED);
-            eventBus.publish(new PluginFailedEvent(descriptor, failState, e));
-            throw e;
+            eventBus.publish(new PluginFailedEvent(descriptor, failState, t));
+            if (t instanceof RuntimeException re) {
+                throw re;
+            }
+            if (t instanceof Error err) {
+                throw new RuntimeException("插件 " + descriptor.id() + " 生命周期阶段抛出 Error", err);
+            }
+            throw new RuntimeException("插件 " + descriptor.id() + " 生命周期阶段异常", t);
         }
     }
 

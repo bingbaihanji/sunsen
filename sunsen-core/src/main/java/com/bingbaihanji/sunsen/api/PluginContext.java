@@ -56,14 +56,8 @@ public interface PluginContext {
      * @return 扩展实例，未找到时返回 {@link Optional#empty()}
      */
     default <T> Optional<T> getExtension(Class<T> extensionPoint, String extensionId) {
-        List<ExtensionInfo> infos = getExtensionInfos(extensionPoint);
-        List<T> exts = getExtensions(extensionPoint);
-        for (int i = 0; i < infos.size() && i < exts.size(); i++) {
-            if (infos.get(i).extensionId().equals(extensionId)) {
-                return Optional.of(exts.get(i));
-            }
-        }
-        return Optional.empty();
+        // 委托给 PluginManager 的单次原子查询,避免两次独立调用的快照错配
+        return getPluginManager().getExtension(extensionPoint, extensionId);
     }
 
     /**

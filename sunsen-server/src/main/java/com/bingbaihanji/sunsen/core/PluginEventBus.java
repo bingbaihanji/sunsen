@@ -105,14 +105,19 @@ public class PluginEventBus {
     @SuppressWarnings("unchecked")
     private void dispatch(CopyOnWriteArrayList<Subscription<?>> list, PluginEvent event) {
         for (Subscription<?> sub : list) {
-            executor.execute(() -> {
-                try {
-                    ((Subscription<PluginEvent>) sub).listener.onEvent(event);
-                } catch (Exception e) {
-                    LOGGER.log(System.Logger.Level.ERROR,
-                            () -> "事件监听器处理异常: " + sub.listener.getClass().getName(), e);
-                }
-            });
+            try {
+                executor.execute(() -> {
+                    try {
+                        ((Subscription<PluginEvent>) sub).listener.onEvent(event);
+                    } catch (Throwable t) {
+                        LOGGER.log(System.Logger.Level.ERROR,
+                                () -> "事件监听器处理异常: " + sub.listener.getClass().getName(), t);
+                    }
+                });
+            } catch (java.util.concurrent.RejectedExecutionException e) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        () -> "事件总线已关闭或过载,丢弃事件: " + event.getClass().getSimpleName());
+            }
         }
     }
 

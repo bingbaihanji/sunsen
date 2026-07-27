@@ -136,6 +136,9 @@ public class PluginWatcher implements AutoCloseable {
             for (WatchEvent<?> event : key.pollEvents()) {
                 WatchEvent.Kind<?> kind = event.kind();
                 if (kind == StandardWatchEventKinds.OVERFLOW) {
+                    // 事件溢出:全目录重扫对账,防止遗漏变更
+                    LOGGER.log(System.Logger.Level.WARNING, "PluginWatcher: OVERFLOW, triggering full rescan");
+                    rescanDirectory();
                     continue;
                 }
 
@@ -157,7 +160,11 @@ public class PluginWatcher implements AutoCloseable {
                     handleDelete(fullPath);
                 }
             }
-            key.reset();
+            if (!key.reset()) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        () -> "PluginWatcher: watch key became invalid, plugins directory may have been deleted");
+                break;
+            }
             flushPending();
         }
     }
@@ -222,6 +229,14 @@ public class PluginWatcher implements AutoCloseable {
                 LOGGER.log(System.Logger.Level.ERROR,
                         () -> "PluginWatcher: failed to auto-reload plugin " + pluginId, e);
             }
+        } else {
+            // LOADED / RESOLVED / STARTING / STOPPING: 插件正在过渡中,记录日志并跳过
+            // 下次 JAR 变更事件时重试
+            LOGGER.log(System.Logger.Level.INFO,
+                    () -> "PluginWatcher: skipping reload for " + pluginId
+                            + " (current state: " + currentState + "), will retry on next event");
+            // 重新加入 pending 以便下次 flush 重试
+            pendingModify.put(jar, System.currentTimeMillis());
         }
     }
 
@@ -249,6 +264,29 @@ public class PluginWatcher implements AutoCloseable {
                         () -> "PluginWatcher: failed to auto-unload plugin " + pluginId, e);
             }
         });
+    }
+
+    /**
+     * 全目录重扫:读取目录中所有JAR并与已加载插件对账.
+     * 用于 OVERFLOW 恢复和初始化后手动加载插件的映射更新.
+     */
+    private void rescanDirectory() {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(pluginsDir, "*.jar")) {
+            for (Path jar : stream) {
+                Path normalized = jar.toAbsolutePath().normalize();
+                try {
+                    PluginDescriptor desc = PluginDescriptorLoader.load(normalized);
+                    if (manager.getPlugin(desc.id()).isPresent()) {
+                        jarToPluginId.put(normalized, desc.id());
+                    }
+                } catch (Exception ignored) {
+                    // JAR might be malformed; skip
+                }
+            }
+        } catch (IOException e) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    () -> "PluginWatcher: rescan failed for " + pluginsDir, e);
+        }
     }
 
     /**

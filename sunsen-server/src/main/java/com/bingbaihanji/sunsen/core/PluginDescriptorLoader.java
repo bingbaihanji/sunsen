@@ -27,6 +27,8 @@ public final class PluginDescriptorLoader {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     // 合法 Java 包名正则
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("[a-zA-Z_][a-zA-Z0-9_]*(\\.[a-zA-Z_][a-zA-Z0-9_]*)*");
+    // 插件 ID 白名单:字母数字.-_   ,防止路径遍历攻击
+    private static final Pattern PLUGIN_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9._-]*$");
 
     /**
      * 禁止实例化
@@ -73,6 +75,9 @@ public final class PluginDescriptorLoader {
         require(root, "packagePrefixes");
 
         String id = requireNonBlank(root.get("id").asText(), "id");
+        if (!PLUGIN_ID_PATTERN.matcher(id).matches()) {
+            throw new PluginLoadException("插件 ID 包含非法字符: '" + id + "'，仅允许字母、数字、点、下划线、连字符");
+        }
         String name = requireNonBlank(root.get("name").asText(), "name");
         String description = getText(root, "description", "");
         String version = requireNonBlank(root.get("version").asText(), "version");

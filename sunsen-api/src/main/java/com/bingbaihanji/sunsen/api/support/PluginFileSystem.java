@@ -72,7 +72,15 @@ public final class PluginFileSystem implements AutoCloseable {
     public Path resolve(String relativePath) {
         ensureOpen();
         Path resolved = workDir.resolve(relativePath).toAbsolutePath().normalize();
-        if (!resolved.startsWith(workDir)) {
+        // 对已存在的文件使用 toRealPath 防止符号链接逃逸
+        if (Files.exists(resolved)) {
+            try {
+                resolved = resolved.toRealPath();
+            } catch (IOException ignored) {
+                // 无法解析真实路径时使用 normalize 结果(尽力而为)
+            }
+        }
+        if (!resolved.startsWith(workDir.toAbsolutePath().normalize())) {
             throw new PluginPermissionException(
                     "Plugin '" + pluginId + "' attempted to access path outside work directory: " + relativePath
             );

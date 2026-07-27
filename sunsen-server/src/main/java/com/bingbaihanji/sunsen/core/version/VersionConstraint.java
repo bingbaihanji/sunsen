@@ -46,7 +46,12 @@ public final class VersionConstraint {
         if (expr.startsWith("^")) {
             SemVer base = SemVer.parse(expr.substring(1).trim());
             predicates.add(new Predicate(Operator.GTE, base));
-            predicates.add(new Predicate(Operator.LT, new SemVer(base.major() + 1, 0, 0)));
+            if (base.major() == 0) {
+                // ^0.x: 锁定次版本,兼容 npm/cargo 惯例
+                predicates.add(new Predicate(Operator.LT, new SemVer(0, base.minor() + 1, 0)));
+            } else {
+                predicates.add(new Predicate(Operator.LT, new SemVer(base.major() + 1, 0, 0)));
+            }
             return new VersionConstraint(predicates);
         }
         if (expr.startsWith("~")) {

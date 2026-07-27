@@ -128,10 +128,22 @@ public class ExtensionRegistry {
             String key = extensionPointType.getName();
             List<ExtensionEntry<?>> list = entries.computeIfAbsent(key, k -> new ArrayList<>());
 
-            // sole 扩展点：全局只能有一个插件实现，冲突时保留 order 最小（优先级最高）的
+            // sole 扩展点：全局只能有一个插件实现(含同插件内),冲突时保留 order 最小(优先级最高)的
             if (isSole && !list.isEmpty()) {
                 ExtensionEntry<?> existing = list.get(0);
-                if (!existing.pluginId().equals(descriptor.id())) {
+                // 同插件内重复实现 sole 扩展点:直接拒绝,不参与竞争
+                if (existing.pluginId().equals(descriptor.id())) {
+                    LOGGER.log(System.Logger.Level.WARNING,
+                            () -> String.format("Sole extension point '%s': plugin '%s' already has an implementation"
+                                    + " (order=%d), rejecting duplicate (order=%d).",
+                                    key, descriptor.id(), existing.order(), order));
+                    if (registrar != null && entry.singleton()) {
+                        pendingDestroyInstance = entry.getInstance();
+                        pendingDestroyType = extensionPointType;
+                    }
+                    insertSortedByOrder(rejectedSoleCandidates.computeIfAbsent(key, k -> new ArrayList<>()), entry);
+                    registered = false;
+                } else {
                     if (order < existing.order()) {
                         LOGGER.log(System.Logger.Level.WARNING,
                                 () -> String.format("Sole extension point '%s' has multiple plugin implementations: " +
@@ -195,20 +207,35 @@ public class ExtensionRegistry {
      */
     @SuppressWarnings("unchecked")
     public <T> List<T> getExtensions(Class<T> extensionPointType) {
+        // 锁内收集条目,锁外实例化非单例扩展(避免反射操作阻塞写锁)
+        List<ExtensionEntry<?>> snapshot;
         lock.readLock().lock();
         try {
             List<ExtensionEntry<?>> list = entries.get(extensionPointType.getName());
             if (list == null || list.isEmpty()) {
                 return List.of();
             }
-            List<T> result = new ArrayList<>(list.size());
-            for (ExtensionEntry<?> e : list) {
-                result.add((T) e.getInstance());
-            }
-            return Collections.unmodifiableList(result);
+            snapshot = List.copyOf(list);
         } finally {
             lock.readLock().unlock();
         }
+
+        List<T> result = new ArrayList<>(snapshot.size());
+        for (ExtensionEntry<?> e : snapshot) {
+            T instance = (T) e.getInstance();
+            result.add(instance);
+            // 非单例扩展同样触发 registrar 回调(注意:非单例实例无对应的 destroy 回调)
+            if (!e.singleton() && registrar != null) {
+                try {
+                    registrar.afterExtensionCreated(instance, e.extensionPointType());
+                } catch (Exception ex) {
+                    LOGGER.log(System.Logger.Level.ERROR,
+                            () -> "ExtensionRegistrar.afterExtensionCreated failed for "
+                                    + instance.getClass().getName(), ex);
+                }
+            }
+        }
+        return Collections.unmodifiableList(result);
     }
 
     /**

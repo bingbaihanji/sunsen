@@ -9,8 +9,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,11 +23,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class DefaultPluginContext implements PluginContext {
 
-    private static final Set<String> ALLOWED_METHODS = Set.of(
-            "getPlugin", "getPlugins", "getPluginState", "isPluginActive",
-            "getExtensions", "getExtension", "getExtensionInfos",
-            "publishEvent", "subscribe", "unsubscribe", "close"
-    );
     // 当前插件的描述符
     private final PluginDescriptor descriptor;
     // 扩展注册表,用于获取扩展实例
@@ -157,59 +152,69 @@ public class DefaultPluginContext implements PluginContext {
 
     @Override
     public PluginManager getPluginManager() {
-        return createManagerView();
+        return new PluginManagerView(pluginManager, this);
     }
 
     @Override
     public ThreadFactory getThreadFactory() {
         String pluginId = descriptor.id();
+        ClassLoader pluginClassLoader = Thread.currentThread().getContextClassLoader();
         return task -> {
-            Thread t = new Thread(threadGroup, task,
-                    pluginId + "-thread-" + threadCounter.incrementAndGet());
+            Thread t = new Thread(threadGroup, () -> {
+                ClassLoader prev = Thread.currentThread().getContextClassLoader();
+                Thread.currentThread().setContextClassLoader(pluginClassLoader);
+                try {
+                    task.run();
+                } finally {
+                    Thread.currentThread().setContextClassLoader(prev);
+                }
+            }, pluginId + "-thread-" + threadCounter.incrementAndGet());
             t.setDaemon(true);
             return t;
         };
     }
 
-    @SuppressWarnings("unchecked")
-    private PluginManager createManagerView() {
-        final PluginManager delegate = pluginManager;
-        final DefaultPluginContext context = this;
-        return (PluginManager) java.lang.reflect.Proxy.newProxyInstance(
-                PluginManager.class.getClassLoader(),
-                new Class<?>[]{PluginManager.class},
-                (proxy, method, args) -> {
-                    String name = method.getName();
-                    if (!ALLOWED_METHODS.contains(name)) {
-                        throw new PluginPermissionException(
-                                "Plugin cannot invoke " + name + " via PluginContext");
-                    }
-                    return switch (name) {
-                        case "publishEvent" -> {
-                            context.publishEvent((PluginEvent) args[0]);
-                            yield null;
-                        }
-                        case "subscribe" -> {
-                            @SuppressWarnings("rawtypes")
-                            Class rawType = (Class) args[0];
-                            @SuppressWarnings("rawtypes")
-                            PluginEventListener rawListener = (PluginEventListener) args[1];
-                            context.subscribe(rawType, rawListener);
-                            yield null;
-                        }
-                        case "unsubscribe" -> {
-                            @SuppressWarnings("rawtypes")
-                            Class rawType = (Class) args[0];
-                            @SuppressWarnings("rawtypes")
-                            PluginEventListener rawListener = (PluginEventListener) args[1];
-                            context.unsubscribe(rawType, rawListener);
-                            yield null;
-                        }
-                        case "close" -> null;
-                        default -> method.invoke(delegate, args);
-                    };
-                }
-        );
+    /**
+     * 插件可见的 PluginManager 受限视图.
+     * 发布/订阅事件通过 PluginContext 代理以绑定插件身份,
+     * close() 为 no-op(插件不能关闭管理器),其余方法直接委托.
+     */
+    private static class PluginManagerView implements PluginManager {
+        private final PluginManager delegate;
+        private final DefaultPluginContext context;
+
+        PluginManagerView(PluginManager delegate, DefaultPluginContext context) {
+            this.delegate = delegate;
+            this.context = context;
+        }
+
+        @Override public void loadPlugins() { delegate.loadPlugins(); }
+        @Override public List<PluginLoadError> loadPluginsWithResult() { return delegate.loadPluginsWithResult(); }
+        @Override public void startPlugins() { delegate.startPlugins(); }
+        @Override public void stopPlugins() { delegate.stopPlugins(); }
+        @Override public void unloadPlugins() { delegate.unloadPlugins(); }
+        @Override public PluginDescriptor loadPlugin(Path jarPath) { return delegate.loadPlugin(jarPath); }
+        @Override public void startPlugin(String pluginId) { delegate.startPlugin(pluginId); }
+        @Override public void stopPlugin(String pluginId) { delegate.stopPlugin(pluginId); }
+        @Override public void unloadPlugin(String pluginId) { delegate.unloadPlugin(pluginId); }
+        @Override public void reloadPlugin(String pluginId, Path newJarPath) { delegate.reloadPlugin(pluginId, newJarPath); }
+        @Override public void reloadPlugin(String pluginId) { delegate.reloadPlugin(pluginId); }
+        @Override public void installPlugin(Path source) { delegate.installPlugin(source); }
+        @Override public void uninstallPlugin(String pluginId) { delegate.uninstallPlugin(pluginId); }
+        @Override public Optional<PluginDescriptor> getPlugin(String pluginId) { return delegate.getPlugin(pluginId); }
+        @Override public List<PluginDescriptor> getPlugins() { return delegate.getPlugins(); }
+        @Override public PluginState getPluginState(String pluginId) { return delegate.getPluginState(pluginId); }
+        @Override public <T> List<T> getExtensions(Class<T> ep) { return delegate.getExtensions(ep); }
+        @Override public <T> Optional<T> getExtension(Class<T> ep, String id) { return delegate.getExtension(ep, id); }
+        @Override public <T> List<ExtensionInfo> getExtensionInfos(Class<T> ep) { return delegate.getExtensionInfos(ep); }
+        @Override
+        public void publishEvent(PluginEvent event) { context.publishEvent(event); }
+        @Override
+        public <T extends PluginEvent> void subscribe(Class<T> et, PluginEventListener<T> l) { context.subscribe(et, l); }
+        @Override
+        public <T extends PluginEvent> void unsubscribe(Class<T> et, PluginEventListener<T> l) { context.unsubscribe(et, l); }
+        @Override public void setExtensionRegistrar(ExtensionRegistrar r) { delegate.setExtensionRegistrar(r); }
+        @Override public void close() { /* no-op: 插件不可关闭管理器 */ }
     }
 
     /**

@@ -167,15 +167,29 @@ public class DefaultPluginManager implements PluginManager {
      * 任务抛出的异常会被捕获并重新抛出.
      */
     private void executeWithTimeout(Runnable task, String pluginId, String phaseName) {
-        if (lifecycleTimeoutMs <= 0) {
-            task.run();
-            return;
-        }
-        java.util.concurrent.atomic.AtomicReference<Exception> error = new java.util.concurrent.atomic.AtomicReference<>();
-        Thread t = Thread.ofPlatform().daemon().start(() -> {
+        executeWithTimeout(task, pluginId, phaseName, null);
+    }
+
+    private void executeWithTimeout(Runnable task, String pluginId, String phaseName, ClassLoader pluginClassLoader) {
+        Runnable wrappedTask = pluginClassLoader != null ? () -> {
+            ClassLoader prev = Thread.currentThread().getContextClassLoader();
+            Thread.currentThread().setContextClassLoader(pluginClassLoader);
             try {
                 task.run();
-            } catch (Exception e) {
+            } finally {
+                Thread.currentThread().setContextClassLoader(prev);
+            }
+        } : task;
+
+        if (lifecycleTimeoutMs <= 0) {
+            wrappedTask.run();
+            return;
+        }
+        java.util.concurrent.atomic.AtomicReference<Throwable> error = new java.util.concurrent.atomic.AtomicReference<>();
+        Thread t = Thread.ofPlatform().daemon().start(() -> {
+            try {
+                wrappedTask.run();
+            } catch (Throwable e) {
                 error.set(e);
             }
         });
@@ -185,10 +199,13 @@ public class DefaultPluginManager implements PluginManager {
                 t.interrupt();
                 throw new PluginLoadException("插件 " + pluginId + " " + phaseName + " 超时 (" + lifecycleTimeoutMs + "ms)");
             }
-            Exception captured = error.get();
+            Throwable captured = error.get();
             if (captured != null) {
                 if (captured instanceof RuntimeException re) {
                     throw re;
+                }
+                if (captured instanceof Error err) {
+                    throw err;
                 }
                 throw new PluginLoadException("插件 " + pluginId + " " + phaseName + " 异常", captured);
             }
@@ -642,12 +659,20 @@ public class DefaultPluginManager implements PluginManager {
             throw new PluginLoadException("Cannot copy plugin JAR to " + dest, e);
         }
 
+        // 先解析描述符获取 ID,用于失败回滚
+        final String pluginId = PluginDescriptorLoader.load(dest).id();
         PluginDescriptor descriptor;
         try {
             descriptor = loadPlugin(dest);
-            startPlugin(descriptor.id());
+            startPlugin(pluginId);
         } catch (Exception e) {
-            // Clean up copied JAR on failure
+            // 先完整卸载已加载的插件(内存回滚),再删除 JAR 文件
+            try {
+                unloadPlugin(pluginId);
+            } catch (Exception unloadEx) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        () -> "installPlugin: failed to unload after start failure: " + pluginId, unloadEx);
+            }
             try {
                 Files.deleteIfExists(dest);
             } catch (IOException ignored) {
@@ -815,7 +840,7 @@ public class DefaultPluginManager implements PluginManager {
             contextHolder[0] = context;
 
             stateMachine.executePhase(
-                    () -> executeWithTimeout(() -> pluginInstance.onInit(context), pluginId, "onInit"),
+                    () -> executeWithTimeout(() -> pluginInstance.onInit(context), pluginId, "onInit", classLoader),
                     descriptor, PluginState.RESOLVED);
 
             // Scan extensions
@@ -859,7 +884,7 @@ public class DefaultPluginManager implements PluginManager {
         }
         stateMachine.transition(pluginId, current, PluginState.STARTING);
         stateMachine.executePhase(
-                () -> executeWithTimeout(entry.plugin()::onStart, pluginId, "onStart"),
+                () -> executeWithTimeout(entry.plugin()::onStart, pluginId, "onStart", entry.classLoader()),
                 entry.descriptor(), PluginState.STARTING);
         stateMachine.transition(pluginId, PluginState.STARTING, PluginState.ACTIVE);
         eventBus.publish(new PluginStartedEvent(entry.descriptor()));
@@ -873,7 +898,7 @@ public class DefaultPluginManager implements PluginManager {
 
         stateMachine.transition(pluginId, PluginState.ACTIVE, PluginState.STOPPING);
         stateMachine.executePhase(
-                () -> executeWithTimeout(entry.plugin()::onStop, pluginId, "onStop"),
+                () -> executeWithTimeout(entry.plugin()::onStop, pluginId, "onStop", entry.classLoader()),
                 entry.descriptor(), PluginState.STOPPING);
         stateMachine.transition(pluginId, PluginState.STOPPING, PluginState.STOPPED);
         eventBus.publish(new PluginStoppedEvent(entry.descriptor()));
@@ -919,7 +944,7 @@ public class DefaultPluginManager implements PluginManager {
 
         // 1. invoke onDestroy callback (with timeout protection)
         try {
-            executeWithTimeout(entry.plugin()::onDestroy, pluginId, "onDestroy");
+            executeWithTimeout(entry.plugin()::onDestroy, pluginId, "onDestroy", entry.classLoader());
         } catch (Exception e) {
             LOGGER.log(System.Logger.Level.WARNING, () -> "Plugin onDestroy error: " + pluginId, e);
         }
