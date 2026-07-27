@@ -249,10 +249,10 @@ public class DependencyResolver {
      * 深度优先搜索,发现环时立即抛出异常.
      */
     private void dfs(String node,
-                        Map<String, List<String>> adj,
-                        Set<String> visited,
-                        Set<String> recStack,
-                        Deque<String> path) {
+                     Map<String, List<String>> adj,
+                     Set<String> visited,
+                     Set<String> recStack,
+                     Deque<String> path) {
         visited.add(node);
         recStack.add(node);
         path.push(node);

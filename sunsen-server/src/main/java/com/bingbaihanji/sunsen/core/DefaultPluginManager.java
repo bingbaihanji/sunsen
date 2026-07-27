@@ -258,16 +258,20 @@ public class DefaultPluginManager implements PluginManager {
                     continue;
                 }
                 if (plugins.containsKey(descriptor.id())) {
-                    PluginLoadException ex = new PluginLoadException(
-                            "Plugin already loaded: '" + descriptor.id() + "' found in " + jarPath);
-                    errors.add(new PluginLoadError(descriptor.id(), jarPath, ex));
-                    LOGGER.log(System.Logger.Level.ERROR, () -> "Parse plugin failed: " + jarPath, ex);
+                    LOGGER.log(System.Logger.Level.INFO,
+                            () -> "Plugin already loaded, skip duplicate scan entry: " + jarPath);
                     continue;
                 }
                 descriptors.add(descriptor);
                 descriptorToJar.put(descriptor.id(), jarPath);
                 stateMachine.init(descriptor.id(), PluginState.CREATED);
             } catch (Exception e) {
+                if (e instanceof IllegalStateException && e.getMessage() != null
+                        && e.getMessage().contains("已在状态机中注册")) {
+                    LOGGER.log(System.Logger.Level.INFO,
+                            () -> "Plugin already being loaded, skip duplicate scan entry: " + jarPath);
+                    continue;
+                }
                 errors.add(new PluginLoadError(jarPath.getFileName().toString(), jarPath, e));
                 LOGGER.log(System.Logger.Level.ERROR, () -> "Parse plugin failed: " + jarPath, e);
             }
@@ -281,8 +285,10 @@ public class DefaultPluginManager implements PluginManager {
         try {
             // 锁内：防止并发 loadPlugins/loadPlugin 导致的 ClassLoader 泄漏
             try {
-                PluginClassLoader.validatePrefixes(descriptors);
-                dependencyResolver.resolve(descriptors);
+                List<PluginDescriptor> allDescriptors = new ArrayList<>(getPlugins());
+                allDescriptors.addAll(descriptors);
+                PluginClassLoader.validatePrefixes(allDescriptors);
+                dependencyResolver.resolve(allDescriptors);
             } catch (Exception e) {
                 for (PluginDescriptor d : descriptors) {
                     stateMachine.remove(d.id());
@@ -526,15 +532,16 @@ public class DefaultPluginManager implements PluginManager {
                 stopSinglePlugin(pluginId);
             }
 
-            // Phase 2: cleanup old plugin instance without touching ExtensionRegistry
+            // Phase 2: cleanup old plugin instance and atomically swap extension registry entries.
             Path oldJarPath = oldEntry.jarPath();
-            PluginDescriptor oldDescriptor = cleanupPluginInstance(pluginId);
+            PluginDescriptor oldDescriptor = oldEntry.descriptor();
 
-            // Phase 3: atomically unregister old extensions and register new ones
-            // inside a SINGLE write lock — no gap where getExtensions() sees empty.
+            // Phase 3: atomically unregister old extensions, destroy old instance and register new extensions
+            // inside a SINGLE write lock — readers never observe destroyed old extensions or an empty gap.
             try {
                 extensionRegistry.withWriteLock(() -> {
                     unregisterPluginFromRegistry(pluginId);
+                    cleanupPluginInstance(pluginId);
                     stateMachine.init(newDescriptor.id(), PluginState.CREATED);
                     loadSinglePluginCore(newDescriptor, newJarPath);
                 });
@@ -670,15 +677,19 @@ public class DefaultPluginManager implements PluginManager {
             startPlugin(pluginId);
         } catch (Exception e) {
             // 先完整卸载已加载的插件(内存回滚),再删除 JAR 文件
-            try {
-                unloadPlugin(pluginId);
-            } catch (Exception unloadEx) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        () -> "installPlugin: failed to unload after start failure: " + pluginId, unloadEx);
+            if (getPlugin(pluginId).isPresent()) {
+                try {
+                    unloadPlugin(pluginId);
+                } catch (Exception unloadEx) {
+                    LOGGER.log(System.Logger.Level.WARNING,
+                            () -> "installPlugin: failed to unload after start failure: " + pluginId, unloadEx);
+                }
             }
             try {
                 Files.deleteIfExists(dest);
-            } catch (IOException ignored) {
+            } catch (IOException deleteEx) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        () -> "installPlugin: failed to delete copied JAR after failure: " + dest, deleteEx);
             }
             throw e;
         }
@@ -986,18 +997,21 @@ public class DefaultPluginManager implements PluginManager {
     }
 
     /**
-     * 卸载单个插件的完整流程(清理实例 + 注册表注销),不发布事件.
+     * 卸载单个插件的完整流程(注册表注销 + 清理实例),不发布事件.
      * 返回被卸载的插件描述符,插件不存在时返回 null.
      */
     private PluginDescriptor doUnloadSinglePlugin(String pluginId) {
-        // Phase A: lock-external cleanup (onDestroy, interrupt, unsubscribe, remove, close ClassLoader)
-        PluginDescriptor descriptor = cleanupPluginInstance(pluginId);
-        if (descriptor == null) {
+        PluginEntry entry = plugins.get(pluginId);
+        if (entry == null) {
             return null;
         }
+        PluginDescriptor descriptor = entry.descriptor();
 
-        // Phase B: lock-internal unregistration
+        // Phase A: make extensions invisible before plugin instance is destroyed.
         extensionRegistry.withWriteLock(() -> unregisterPluginFromRegistry(pluginId));
+
+        // Phase B: lock-external cleanup (onDestroy, interrupt, unsubscribe, remove, close ClassLoader)
+        cleanupPluginInstance(pluginId);
 
         return descriptor;
     }

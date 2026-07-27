@@ -52,8 +52,8 @@
 
 ```java
 // 改前（约 L767-L770）
-        } catch (Exception e) {
-            // executePhase 已发布 PluginFailedEvent
+        }catch(Exception e){
+        // executePhase 已发布 PluginFailedEvent
         }
 
 // 改后：直接删除 catch 块，让异常自然传播
@@ -99,50 +99,62 @@ private void stopSinglePlugin(String pluginId) {
 
 ```java
 // 改前
-for (String pluginId : snapshot) {
-    PluginState state = stateMachine.getState(pluginId);
-    if (state == PluginState.LOADED) {
-        startSinglePlugin(pluginId);
+for(String pluginId :snapshot){
+PluginState state = stateMachine.getState(pluginId);
+    if(state ==PluginState.LOADED){
+
+startSinglePlugin(pluginId);
     }
-}
+            }
 
 // 改后
-for (String pluginId : snapshot) {
-    PluginState state = stateMachine.getState(pluginId);
-    if (state == PluginState.LOADED) {
-        try {
-            startSinglePlugin(pluginId);
-        } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.ERROR,
-                    () -> "Failed to start plugin: " + pluginId, e);
+            for(
+String pluginId :snapshot){
+PluginState state = stateMachine.getState(pluginId);
+    if(state ==PluginState.LOADED){
+        try{
+
+startSinglePlugin(pluginId);
+        }catch(
+Exception e){
+        LOGGER.
+
+log(System.Logger.Level.ERROR,
+                    () ->"Failed to start plugin: "+pluginId,e);
         }
-    }
-}
+        }
+        }
 ```
 
 - [ ] **Step 4: stopPlugins 批量方法加容错**
 
 ```java
 // 改前
-for (String pluginId : snapshot) {
-    PluginState state = stateMachine.getState(pluginId);
-    if (state == PluginState.ACTIVE) {
-        stopSinglePlugin(pluginId);
+for(String pluginId :snapshot){
+PluginState state = stateMachine.getState(pluginId);
+    if(state ==PluginState.ACTIVE){
+
+stopSinglePlugin(pluginId);
     }
-}
+            }
 
 // 改后
-for (String pluginId : snapshot) {
-    PluginState state = stateMachine.getState(pluginId);
-    if (state == PluginState.ACTIVE) {
-        try {
-            stopSinglePlugin(pluginId);
-        } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.ERROR,
-                    () -> "Failed to stop plugin: " + pluginId, e);
+            for(
+String pluginId :snapshot){
+PluginState state = stateMachine.getState(pluginId);
+    if(state ==PluginState.ACTIVE){
+        try{
+
+stopSinglePlugin(pluginId);
+        }catch(
+Exception e){
+        LOGGER.
+
+log(System.Logger.Level.ERROR,
+                    () ->"Failed to stop plugin: "+pluginId,e);
         }
-    }
-}
+        }
+        }
 ```
 
 - [ ] **Step 5: startPlugin 单个方法不再忽略返回状态**
@@ -245,6 +257,7 @@ private volatile Properties configProperties = new Properties();
 修改 getProperty 为 synchronized：
 
 ```java
+
 @Override
 public synchronized String getProperty(String key) {
     return configProperties.getProperty(key);
@@ -292,13 +305,21 @@ loadConfig();
 
 // 改后
 Path configFile = pluginWorkDir.resolve("config.properties");
-if (Files.exists(configFile)) {
-    try (InputStream is = Files.newInputStream(configFile)) {
-        configProperties.load(is);
-    } catch (IOException e) {
-        throw new PluginLoadException("Failed to load plugin config: " + configFile, e);
+if(Files.
+
+exists(configFile)){
+        try(
+InputStream is = Files.newInputStream(configFile)){
+        configProperties.
+
+load(is);
+    }catch(
+IOException e){
+        throw new
+
+PluginLoadException("Failed to load plugin config: "+configFile, e);
     }
-}
+            }
 ```
 
 然后删除私有 `loadConfig()` 方法。
@@ -744,15 +765,26 @@ private static final System.Logger LOGGER = System.getLogger(AbstractPlugin.clas
 
 ```java
 // 改前
-} catch (Exception ignored) {
-}
+}catch(Exception ignored){
+        }
 
 // 改后
-} catch (Exception e) {
-    LOGGER.log(System.Logger.Level.WARNING,
-            () -> pluginId() + ": failed to close managed resource "
-                  + managedResources.get(i).getClass().getName(), e);
-}
+        }catch(
+Exception e){
+        LOGGER.
+
+log(System.Logger.Level.WARNING,
+            () ->
+
+pluginId() +": failed to close managed resource "
+        +managedResources.
+
+get(i).
+
+getClass().
+
+getName(),e);
+        }
 ```
 
 注意：`pluginId()` 间接调用 `context().getDescriptor().id()` —— 此时 `context` 尚未置空（`context = null` 在循环之后执行），所以调用安全。
@@ -1145,7 +1177,9 @@ class PluginEventBusTest {
         PluginEventBus bus = new PluginEventBus();
         AtomicInteger counter = new AtomicInteger();
 
-        bus.subscribe(PluginLoadedEvent.class, e -> { throw new RuntimeException("boom"); });
+        bus.subscribe(PluginLoadedEvent.class, e -> {
+            throw new RuntimeException("boom");
+        });
         bus.subscribe(PluginLoadedEvent.class, e -> counter.incrementAndGet());
 
         bus.publish(new PluginLoadedEvent(descriptor("a", "1.0")));
@@ -1425,31 +1459,53 @@ class ExtensionScannerTest {
     }
 
     static class MixedInterface implements Greeting, NotAnExtensionPoint {
-        public String say() { return "hi"; }
+        public String say() {
+            return "hi";
+        }
     }
 
-    static abstract class AbstractGreeting implements Greeting {}
+    static abstract class AbstractGreeting implements Greeting {
+    }
 
     @Extension
     static class ConcreteGreeting extends AbstractGreeting {
-        public String say() { return "hello"; }
+        public String say() {
+            return "hello";
+        }
     }
 
     static class PureNotExtension implements NotAnExtensionPoint {
-        public void foo() {}
+        public void foo() {
+        }
     }
 
     @Extension(id = "a", order = 0)
-    static class SingleA implements SingleUse { public String use() { return "a"; } }
+    static class SingleA implements SingleUse {
+        public String use() {
+            return "a";
+        }
+    }
 
     @Extension(id = "b", order = 1)
-    static class SingleB implements SingleUse { public String use() { return "b"; } }
+    static class SingleB implements SingleUse {
+        public String use() {
+            return "b";
+        }
+    }
 
     @Extension
-    static class MultiA implements MultiUse { public String use() { return "a"; } }
+    static class MultiA implements MultiUse {
+        public String use() {
+            return "a";
+        }
+    }
 
     @Extension
-    static class MultiB implements MultiUse { public String use() { return "b"; } }
+    static class MultiB implements MultiUse {
+        public String use() {
+            return "b";
+        }
+    }
 
     // ---- Tests ----
 

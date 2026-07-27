@@ -1,8 +1,6 @@
 package com.bingbaihanji.sunsen.core;
 
-import com.bingbaihanji.sunsen.api.CircularDependencyException;
-import com.bingbaihanji.sunsen.api.PluginLoadException;
-import com.bingbaihanji.sunsen.api.PluginState;
+import com.bingbaihanji.sunsen.api.*;
 import com.bingbaihanji.sunsen.core.test.ext.GreetingExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -14,6 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -226,6 +226,53 @@ public class DefaultPluginManagerIT {
         assertEquals(2, manager.getPlugins().size(), "two valid plugins should still load");
         assertEquals(PluginState.LOADED, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
         assertEquals(PluginState.LOADED, manager.getPluginState("com.bingbaihanji.sunsen.core.test.world"));
+    }
+
+    @Test
+    void testLoadPluginsIncrementallyUsesAlreadyLoadedDependencies() throws Exception {
+        Files.deleteIfExists(pluginsDir.resolve("plugin-world.jar"));
+
+        manager = new DefaultPluginManager();
+        manager.setPluginsDir(pluginsDir);
+
+        manager.loadPlugins();
+        assertEquals(1, manager.getPlugins().size());
+        assertEquals(PluginState.LOADED, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
+
+        Files.copy(worldJar, pluginsDir.resolve("plugin-world.jar"), StandardCopyOption.REPLACE_EXISTING);
+
+        manager.loadPlugins();
+
+        assertEquals(2, manager.getPlugins().size());
+        assertEquals(PluginState.LOADED, manager.getPluginState("com.bingbaihanji.sunsen.core.test.world"));
+    }
+
+    @Test
+    void testPluginManagerViewRejectsHostManagementOperations() {
+        PluginDescriptor descriptor = new PluginDescriptor(
+                "plugin-view-test",
+                "Plugin View Test",
+                "",
+                "1.0.0",
+                "1.0",
+                "example.Plugin",
+                List.of("example"),
+                List.of(),
+                Set.of(),
+                Map.of()
+        );
+        DefaultPluginContext context = new DefaultPluginContext(
+                descriptor,
+                new ExtensionRegistry(),
+                new PluginEventBus(),
+                new DefaultPluginManager(),
+                pluginsDir.resolve("plugin-view-test"),
+                new ThreadGroup("plugin-view-test")
+        );
+
+        assertThrows(PluginPermissionException.class, () -> context.getPluginManager().unloadPlugins());
+        assertThrows(PluginPermissionException.class, () -> context.getPluginManager().installPlugin(helloJar));
+        assertDoesNotThrow(() -> context.getPluginManager().getPlugins());
     }
 
     @Test

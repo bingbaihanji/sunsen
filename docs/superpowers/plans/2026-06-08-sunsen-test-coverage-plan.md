@@ -1,10 +1,12 @@
 # Sunsen 测试覆盖补全实现计划
 
-> **对于代理式工作器：** 要求的子技能：使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans 按任务逐步实现本计划。步骤使用复选框（`- [ ]`）语法进行跟踪。
+> **对于代理式工作器：** 要求的子技能：使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans
+> 按任务逐步实现本计划。步骤使用复选框（`- [ ]`）语法进行跟踪。
 
 **目标：** 为 PluginClassLoader、PluginWatcher 和 DefaultPluginManager 三个核心组件补全 24 个测试用例。
 
-**架构：** 按方案 B 顺序执行（Manager → ClassLoader → Watcher）。所有测试放在 `sunsen-server/src/test/java/` 下，复用现有 `TestPluginPackager` 编译打包夹具。不引入新依赖。不改生产代码。
+**架构：** 按方案 B 顺序执行（Manager → ClassLoader → Watcher）。所有测试放在 `sunsen-server/src/test/java/` 下，复用现有
+`TestPluginPackager` 编译打包夹具。不引入新依赖。不改生产代码。
 
 **技术栈：** Java 21+, JUnit 5, Maven surefire 3.2.5, `javax.tools.JavaCompiler`（JDK 内置）。
 
@@ -12,28 +14,31 @@
 
 ## 文件结构
 
-| 文件 | 操作 | 测试数 | 说明 |
-|------|------|--------|------|
-| `sunsen-server/src/test/java/.../DefaultPluginManagerIT.java` | 修改 | +8 | 复用已有夹具 helloJar/worldJar |
-| `sunsen-server/src/test/java/.../PluginClassLoaderTest.java` | 新建 | 10 | 程序化构建测试 JAR |
-| `sunsen-server/src/test/java/.../PluginWatcherTest.java` | 新建 | 6 | 文件系统操作 + sleep 等待 |
+| 文件                                                          | 操作 | 测试数 | 说明                           |
+|---------------------------------------------------------------|------|--------|--------------------------------|
+| `sunsen-server/src/test/java/.../DefaultPluginManagerIT.java` | 修改 | +8     | 复用已有夹具 helloJar/worldJar |
+| `sunsen-server/src/test/java/.../PluginClassLoaderTest.java`  | 新建 | 10     | 程序化构建测试 JAR             |
+| `sunsen-server/src/test/java/.../PluginWatcherTest.java`      | 新建 | 6      | 文件系统操作 + sleep 等待      |
 
 ---
 
 ### Task 1: Manager 集成测试增强（8 个新测试）
 
 **文件：**
+
 - 修改：`sunsen-server/src/test/java/com/bingbaihanji/sunsen/core/DefaultPluginManagerIT.java`
 
 **目标：** 在现有测试类末尾新增 8 个测试方法，每个方法独立覆盖一个管理器集成场景。
 
 **已有夹具（可直接使用）：**
+
 - `tempDir`（`@TempDir` 静态变量，所有测试共享）
 - `helloJar`、`worldJar`（`@BeforeAll` 编译打包好的测试 JAR）
 - `pluginsDir`（`@BeforeEach` 创建，包含 hello 和 world 的副本）
 - `manager`（`@BeforeEach` 新建实例，`@AfterEach` 清理）
 
 **需新增夹具：**
+
 - 场景 6 需要一个"损坏版"JAR——创建一个 `plugin.json` 中 `mainClass` 指向不存在类的 JAR
 
 ---
@@ -43,6 +48,7 @@
 在 `sunsen-server/src/test/resources/test-plugins/` 下创建新目录 `plugin-broken/`，包含：
 
 `plugin-broken/plugin.json`：
+
 ```json
 {
   "id": "com.bingbaihanji.sunsen.core.test.hello",
@@ -57,9 +63,12 @@
 
 `plugin-broken/BrokenPlugin.java`（这个类故意不编译——直接在 mainClass 中指向不存在的类实现最小开销）：
 
-实际上这个源文件不需要，TestPluginPackager 会编译 `plugin-broken/` 下的 `.java` 文件。这里只需 plugin.json 即可——但 TestPluginPackager 是先编译再打包的。如果该目录下没有 `.java` 文件，编译步骤会跳过（walkFileTree 没有匹配项），打包的 JAR 将只有 plugin.json 而没有 `.class` 文件，加载时 mainClass 找不到类就会失败。
+实际上这个源文件不需要，TestPluginPackager 会编译 `plugin-broken/` 下的 `.java` 文件。这里只需 plugin.json 即可——但
+TestPluginPackager 是先编译再打包的。如果该目录下没有 `.java` 文件，编译步骤会跳过（walkFileTree 没有匹配项），打包的 JAR 将只有
+plugin.json 而没有 `.class` 文件，加载时 mainClass 找不到类就会失败。
 
 在 `@BeforeAll` 中编译打包：
+
 ```java
 static Path brokenJar;
 
@@ -243,6 +252,7 @@ void testStopAndRestartCycle() {
 ```bash
 mvn test -pl sunsen-server -Dtest=DefaultPluginManagerIT
 ```
+
 Expected: 12 tests run (4 existing + 8 new), all PASS.
 
 - [ ] **Step 11: 提交**
@@ -263,6 +273,7 @@ git commit -m "test: add 8 Manager integration tests for install, uninstall, rel
 ### Task 2: PluginClassLoader 测试（第 1 部分 — 静态方法测试）
 
 **文件：**
+
 - 创建：`sunsen-server/src/test/java/com/bingbaihanji/sunsen/core/PluginClassLoaderTest.java`
 
 **目标：** 覆盖 `matchesPackagePrefix` 和 `validatePrefixes` 两个纯静态方法的边界条件（无需 JAR）。
@@ -335,6 +346,7 @@ class PluginClassLoaderTest {
 ```bash
 mvn test -pl sunsen-server -Dtest=PluginClassLoaderTest
 ```
+
 Expected: 6 tests run, all PASS.
 
 - [ ] **Step 3: 提交**
@@ -351,7 +363,9 @@ git commit -m "test: add PluginClassLoader test covering matchesPackagePrefix an
 ### Task 3: PluginClassLoader 测试（第 2 部分 — JAR 加载测试）
 
 **文件：**
-- 修改：`sunsen-server/src/test/java/com/bingbaihanji/sunsen/core/PluginClassLoaderTest.java`（追加 4 个新测试 + 2 个测试辅助 JAR 方法）
+
+- 修改：`sunsen-server/src/test/java/com/bingbaihanji/sunsen/core/PluginClassLoaderTest.java`（追加 4 个新测试 + 2 个测试辅助
+  JAR 方法）
 
 **目标：** 覆盖 loadClass 的 4 层加载顺序，需要构造真实 JAR 测试。
 
@@ -482,6 +496,7 @@ void testDependencyChainResolution() throws Exception {
 - [ ] **Step 3: 也是编译需要的 import 补充**
 
 在 PluginClassLoaderTest.java 文件顶部已有 package 声明后，需要的 imports：
+
 ```java
 import org.junit.jupiter.api.BeforeAll;
 import javax.tools.JavaCompiler;
@@ -502,6 +517,7 @@ import java.nio.file.Path;
 ```bash
 mvn test -pl sunsen-server -Dtest=PluginClassLoaderTest
 ```
+
 Expected: 10 tests run (6 static + 4 JAR-based), all PASS.
 
 - [ ] **Step 5: 提交**
@@ -521,6 +537,7 @@ git commit -m "test: add PluginClassLoader JAR loading tests covering loadClass 
 ### Task 4: PluginWatcher 测试
 
 **文件：**
+
 - 创建：`sunsen-server/src/test/java/com/bingbaihanji/sunsen/core/PluginWatcherTest.java`
 
 **目标：** 覆盖文件创建/修改/删除事件、防抖合并、非 JAR 过滤、损坏文件处理。
@@ -686,6 +703,7 @@ class PluginWatcherTest {
 ```bash
 mvn test -pl sunsen-server -Dtest=PluginWatcherTest
 ```
+
 Expected: 6 tests run, all PASS.
 
 - [ ] **Step 3: 运行全量测试确认无回归**
@@ -693,6 +711,7 @@ Expected: 6 tests run, all PASS.
 ```bash
 mvn test -pl sunsen-server
 ```
+
 Expected: all tests pass (103 original + 24 new = 127 total).
 
 - [ ] **Step 4: 提交**
@@ -712,15 +731,16 @@ git commit -m "test: add PluginWatcher test covering auto-load, reload, unload, 
 ## 自审清单
 
 1. **规范覆盖** — 对照规范三阶段：
-   - Manager 集成测试（8 个）→ Task 1 ✓
-   - PluginClassLoader 单测（10 个）→ Tasks 2+3 ✓
-   - PluginWatcher 单测（6 个）→ Task 4 ✓
+    - Manager 集成测试（8 个）→ Task 1 ✓
+    - PluginClassLoader 单测（10 个）→ Tasks 2+3 ✓
+    - PluginWatcher 单测（6 个）→ Task 4 ✓
 
 2. **占位符扫描** — 无 TBD/TODO/placeholder ✓
 
-3. **类型一致性** — 
-   - Task 1 中的 `brokenJar` 与 `@BeforeAll` 新变量在 Task 1 Step 1 中定义 ✓
-   - Task 2+3 使用同一个 `PluginClassLoaderTest.java` 文件，先提交静态测试（Task 2），再追加 JAR 测试（Task 3），文件始终被正确维护 ✓
-   - `buildSimpleJar` 方法的 imports 在 Task 3 Step 3 中补充 ✓
+3. **类型一致性** —
+    - Task 1 中的 `brokenJar` 与 `@BeforeAll` 新变量在 Task 1 Step 1 中定义 ✓
+    - Task 2+3 使用同一个 `PluginClassLoaderTest.java` 文件，先提交静态测试（Task 2），再追加 JAR 测试（Task 3），文件始终被正确维护
+      ✓
+    - `buildSimpleJar` 方法的 imports 在 Task 3 Step 3 中补充 ✓
 
 4. **checklist 语法** — 所有步骤使用 `- [ ]` ✓

@@ -4,6 +4,8 @@
   "version": "2.0.0",
   "apiVersion": "1.0",
   "mainClass": "com.bingbaihanji.sunsen.core.test.broken.DoesNotExist",
-  "packagePrefixes": ["com.bingbaihanji.sunsen.core.test.broken"],
+  "packagePrefixes": [
+    "com.bingbaihanji.sunsen.core.test.broken"
+  ],
   "dependencies": []
 }

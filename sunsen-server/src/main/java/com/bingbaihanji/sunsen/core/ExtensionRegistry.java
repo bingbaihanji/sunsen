@@ -135,7 +135,7 @@ public class ExtensionRegistry {
                 if (existing.pluginId().equals(descriptor.id())) {
                     LOGGER.log(System.Logger.Level.WARNING,
                             () -> String.format("Sole extension point '%s': plugin '%s' already has an implementation"
-                                    + " (order=%d), rejecting duplicate (order=%d).",
+                                            + " (order=%d), rejecting duplicate (order=%d).",
                                     key, descriptor.id(), existing.order(), order));
                     if (registrar != null && entry.singleton()) {
                         pendingDestroyInstance = entry.getInstance();

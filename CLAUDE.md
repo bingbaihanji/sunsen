@@ -99,8 +99,8 @@ size 校验。
 
 ### apiVersion 兼容性闸门
 
-`SunsenVersion.API_VERSION`（`sunsen-core`，当前 `"1.1"`）和插件 `plugin.json` 的 `apiVersion` 只需 major 版本号一致即视为兼容（实现为 SemVer major 比较），minor/patch 差异不影响加载。框架公开
-API 的破坏性变更必须同步升 `API_VERSION` 主号；新增方法之类的兼容变更不需要升版本号。
+`SunsenVersion.API_VERSION`（`sunsen-core`，当前 `"1.1"`）和插件 `plugin.json` 的 `apiVersion` 只需 major 版本号一致即视为兼容（实现为
+SemVer major 比较），minor/patch 差异不影响加载。框架公开 API 的破坏性变更必须同步升 `API_VERSION` 主号；新增方法之类的兼容变更不需要升版本号。
 
 ### 权限模型：`PluginContext` 网关
 

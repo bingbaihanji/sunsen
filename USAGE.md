@@ -215,18 +215,18 @@ public class HelloPlugin extends AbstractPlugin {
 
 **`@Plugin` 属性说明**:
 
-| 属性                | 必填 | 说明                                       |
-|-------------------|----|------------------------------------------|
-| `id`              | ✅  | 全局唯一标识,建议反向域名格式                          |
-| `name`            | ✅  | 展示名称                                     |
-| `version`         | ✅  | SemVer 格式,如 `1.2.0`                      |
-| `packagePrefixes` | ✅  | 插件私有包前缀,至少提供一个                           |
-| `description`     | ❌  | 插件描述                                     |
-| `apiVersion`      | ❌  | 默认空,自动使用框架当前 `SunsenVersion.API_VERSION` |
-| `mainClass`       | ❌  | 默认空,自动推断为标注类本身                           |
-| `dependencies`    | ❌  | 依赖插件列表,嵌套 `@Plugin.Dependency`           |
-| `permissions`     | ❌  | 运行时权限声明                                  |
-| `vendor`          | ❌  | 厂商信息,嵌套 `@Plugin.Vendor`                 |
+| 属性              | 必填 | 说明                                                |
+|-------------------|------|-----------------------------------------------------|
+| `id`              | ✅   | 全局唯一标识,建议反向域名格式                       |
+| `name`            | ✅   | 展示名称                                            |
+| `version`         | ✅   | SemVer 格式,如 `1.2.0`                              |
+| `packagePrefixes` | ✅   | 插件私有包前缀,至少提供一个                         |
+| `description`     | ❌   | 插件描述                                            |
+| `apiVersion`      | ❌   | 默认空,自动使用框架当前 `SunsenVersion.API_VERSION` |
+| `mainClass`       | ❌   | 默认空,自动推断为标注类本身                         |
+| `dependencies`    | ❌   | 依赖插件列表,嵌套 `@Plugin.Dependency`              |
+| `permissions`     | ❌   | 运行时权限声明                                      |
+| `vendor`          | ❌   | 厂商信息,嵌套 `@Plugin.Vendor`                      |
 
 **兼容手动 plugin.json**:若 `src/main/resources/META-INF/plugin.json` 已存在,Processor 自动跳过,以手动文件为准.
 
@@ -259,30 +259,30 @@ public class HelloPlugin extends AbstractPlugin {
 }
 ```
 
-| 字段                | 必填 | 说明                                                         |
-|-------------------|----|------------------------------------------------------------|
-| `id`              | ✅  | 全局唯一标识,建议反向域名格式                                            |
-| `name`            | ✅  | 展示名称                                                       |
-| `version`         | ✅  | SemVer 格式,如 `1.2.0`                                        |
-| `apiVersion`      | ✅  | 编译时依赖的 Sunsen API 主版本号,需与框架 `SunsenVersion.API_VERSION` 一致 |
-| `mainClass`       | ✅  | 实现 `Plugin` 接口的入口类全限定名                                     |
-| `packagePrefixes` | ✅  | 插件私有包前缀,类隔离的核心配置                                           |
-| `dependencies`    | ❌  | 依赖插件列表,支持语义化版本约束                                           |
-| `permissions`     | ❌  | 运行时权限声明(由宿主在 PluginContext 中拦截)                            |
-| `vendor`          | ❌  | 作者/厂商信息,格式为 `{ "name": "...", "url": "..." }`              |
+| 字段              | 必填 | 说明                                                                       |
+|-------------------|------|----------------------------------------------------------------------------|
+| `id`              | ✅   | 全局唯一标识,建议反向域名格式                                              |
+| `name`            | ✅   | 展示名称                                                                   |
+| `version`         | ✅   | SemVer 格式,如 `1.2.0`                                                     |
+| `apiVersion`      | ✅   | 编译时依赖的 Sunsen API 主版本号,需与框架 `SunsenVersion.API_VERSION` 一致 |
+| `mainClass`       | ✅   | 实现 `Plugin` 接口的入口类全限定名                                         |
+| `packagePrefixes` | ✅   | 插件私有包前缀,类隔离的核心配置                                            |
+| `dependencies`    | ❌   | 依赖插件列表,支持语义化版本约束                                            |
+| `permissions`     | ❌   | 运行时权限声明(由宿主在 PluginContext 中拦截)                              |
+| `vendor`          | ❌   | 作者/厂商信息,格式为 `{ "name": "...", "url": "..." }`                     |
 
 **版本约束表达式**:
 
-| 表达式              | 含义                         |
-|------------------|----------------------------|
-| `1.2.0`          | 精确版本                       |
-| `=1.2.0`         | 精确版本                       |
-| `>1.0.0`         | 大于指定版本                     |
-| `<2.0.0`         | 小于指定版本                     |
-| `>=1.0.0`        | 大于等于                       |
-| `<=2.0.0`        | 小于等于                       |
-| `!=1.0.0`        | 不等于                        |
-| `>=1.0.0 <2.0.0` | 范围约束                       |
+| 表达式           | 含义                              |
+|------------------|-----------------------------------|
+| `1.2.0`          | 精确版本                          |
+| `=1.2.0`         | 精确版本                          |
+| `>1.0.0`         | 大于指定版本                      |
+| `<2.0.0`         | 小于指定版本                      |
+| `>=1.0.0`        | 大于等于                          |
+| `<=2.0.0`        | 小于等于                          |
+| `!=1.0.0`        | 不等于                            |
+| `>=1.0.0 <2.0.0` | 范围约束                          |
 | `^1.2.0`         | 兼容版本(等价于 `>=1.2.0 <2.0.0`) |
 | `~1.2.0`         | 近似版本(等价于 `>=1.2.0 <1.3.0`) |
 
@@ -357,12 +357,12 @@ public class EnglishGreeter implements Greeter {
 
 **`@Extension` 属性说明**:
 
-| 属性            | 默认值     | 说明                                       |
-|---------------|---------|------------------------------------------|
-| `id`          | `类全限定名` | 扩展唯一标识                                   |
-| `order`       | `0`     | 排序权重,值越小越靠前                              |
-| `singleton`   | `true`  | 是否单例。`false` 时每次 `getExtensions()` 创建新实例 |
-| `description` | `""`    | 扩展描述                                     |
+| 属性          | 默认值       | 说明                                                  |
+|---------------|--------------|-------------------------------------------------------|
+| `id`          | `类全限定名` | 扩展唯一标识                                          |
+| `order`       | `0`          | 排序权重,值越小越靠前                                 |
+| `singleton`   | `true`       | 是否单例。`false` 时每次 `getExtensions()` 创建新实例 |
+| `description` | `""`         | 扩展描述                                              |
 
 **`allowMultiple = false` 扩展点**:若扩展点接口标注了 `allowMultiple = false`,同一插件内不能有多个实现类,否则加载时报错
 
@@ -501,31 +501,31 @@ public class SunsenConfig {
 
 ### PluginManager (宿主侧)
 
-| 方法                             | 说明                     |
-|--------------------------------|------------------------|
+| 方法                           | 说明                                |
+|--------------------------------|-------------------------------------|
 | `loadPlugins()`                | 扫描目录,拓扑排序后批量加载         |
-| `startPlugins()`               | 按拓扑顺序批量启动              |
-| `stopPlugins()`                | 按拓扑逆序批量停止              |
-| `unloadPlugins()`              | 按拓扑逆序批量卸载              |
-| `reloadPlugin(id, newJarPath)` | 原子热重载(被依赖时拒绝)          |
+| `startPlugins()`               | 按拓扑顺序批量启动                  |
+| `stopPlugins()`                | 按拓扑逆序批量停止                  |
+| `unloadPlugins()`              | 按拓扑逆序批量卸载                  |
+| `reloadPlugin(id, newJarPath)` | 原子热重载(被依赖时拒绝)            |
 | `getExtensions(Class<T>)`      | 获取某扩展点所有实现(按 order 升序) |
-| `getExtension(Class<T>, id)`   | 按扩展 id 精确获取            |
-| `subscribe / unsubscribe`      | 事件监听                   |
-| `setExtensionRegistrar`        | 设置扩展生命周期钩子             |
+| `getExtension(Class<T>, id)`   | 按扩展 id 精确获取                  |
+| `subscribe / unsubscribe`      | 事件监听                            |
+| `setExtensionRegistrar`        | 设置扩展生命周期钩子                |
 
 ### PluginContext (插件侧)
 
-| 方法                               | 说明                           |
-|------------------------------------|------------------------------|
-| `getDescriptor()`                  | 获取本插件元数据(record 类型)          |
-| `getPluginWorkDir()`               | 获取插件专属工作目录                   |
+| 方法                               | 说明                               |
+|------------------------------------|------------------------------------|
+| `getDescriptor()`                  | 获取本插件元数据(record 类型)      |
+| `getPluginWorkDir()`               | 获取插件专属工作目录               |
 | `getProperty(key)`                 | 读取配置(来源:`config.properties`) |
-| `getProperty(key, defaultValue)`   | 读取配置,带默认值                    |
-| `getExtensions(Class<T>)`          | 获取扩展点实现                      |
-| `publishEvent(event)`              | 发布自定义事件                      |
-| `subscribe(eventType, listener)`   | 订阅事件(UNLOADED 时自动清理)         |
-| `unsubscribe(eventType, listener)` | 取消订阅                         |
-| `getPluginManager()`               | 获取 PluginManager             |
+| `getProperty(key, defaultValue)`   | 读取配置,带默认值                  |
+| `getExtensions(Class<T>)`          | 获取扩展点实现                     |
+| `publishEvent(event)`              | 发布自定义事件                     |
+| `subscribe(eventType, listener)`   | 订阅事件(UNLOADED 时自动清理)      |
+| `unsubscribe(eventType, listener)` | 取消订阅                           |
+| `getPluginManager()`               | 获取 PluginManager                 |
 
 ---
 

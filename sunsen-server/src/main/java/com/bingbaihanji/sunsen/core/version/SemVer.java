@@ -30,13 +30,6 @@ public record SemVer(
     }
 
     /**
-     * 判断是否为预发布版本.
-     */
-    public boolean isPreRelease() {
-        return preRelease != null && !preRelease.isBlank();
-    }
-
-    /**
      * 解析语义化版本字符串
      *
      * @param version 版本字符串,如 "1.2.3"、"v1.0.0-beta.1"、"1.2.3+build123"
@@ -85,6 +78,13 @@ public record SemVer(
     }
 
     /**
+     * 判断是否为预发布版本.
+     */
+    public boolean isPreRelease() {
+        return preRelease != null && !preRelease.isBlank();
+    }
+
+    /**
      * 按主、次、修订版本号依次比较,预发布版低于正式版.
      *
      * @param other 另一个 SemVer 对象
@@ -93,14 +93,24 @@ public record SemVer(
     @Override
     public int compareTo(SemVer other) {
         int cmp = Integer.compare(this.major, other.major);
-        if (cmp != 0) return cmp;
+        if (cmp != 0) {
+            return cmp;
+        }
         cmp = Integer.compare(this.minor, other.minor);
-        if (cmp != 0) return cmp;
+        if (cmp != 0) {
+            return cmp;
+        }
         cmp = Integer.compare(this.patch, other.patch);
-        if (cmp != 0) return cmp;
+        if (cmp != 0) {
+            return cmp;
+        }
         // 预发布版本低于对应的正式版本
-        if (this.isPreRelease() && !other.isPreRelease()) return -1;
-        if (!this.isPreRelease() && other.isPreRelease()) return 1;
+        if (this.isPreRelease() && !other.isPreRelease()) {
+            return -1;
+        }
+        if (!this.isPreRelease() && other.isPreRelease()) {
+            return 1;
+        }
         if (this.isPreRelease() && other.isPreRelease()) {
             return this.preRelease.compareTo(other.preRelease);
         }
