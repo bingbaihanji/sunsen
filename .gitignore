@@ -37,3 +37,10 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### 项目内部文档(不纳入版本控制) ###
+/AGENTS.md
+/CLAUDE.md
+/USAGE.md
+/Java开发规范.md
+/docs/
