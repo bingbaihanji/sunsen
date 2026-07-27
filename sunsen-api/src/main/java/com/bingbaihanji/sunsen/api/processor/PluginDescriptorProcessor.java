@@ -92,16 +92,22 @@ public class PluginDescriptorProcessor extends AbstractProcessor {
                 error(typeElement, "@Plugin.packagePrefixes 至少提供一个包前缀");
                 continue;
             }
+            boolean prefixesValid = true;
             for (String prefix : packagePrefixes) {
                 if (prefix == null || prefix.isBlank()) {
                     error(typeElement, "@Plugin.packagePrefixes 包含空值");
+                    prefixesValid = false;
                     break;
                 }
                 String normalized = prefix.endsWith(".") ? prefix.substring(0, prefix.length() - 1) : prefix;
                 if (!PACKAGE_PATTERN.matcher(normalized).matches()) {
                     error(typeElement, "@Plugin.packagePrefixes 包含非法包前缀: '" + prefix + "'");
+                    prefixesValid = false;
                     break;
                 }
+            }
+            if (!prefixesValid) {
+                continue;
             }
 
             // 推断 mainClass
@@ -178,26 +184,20 @@ public class PluginDescriptorProcessor extends AbstractProcessor {
             }
 
             // vendor
-            Plugin.Vendor[] vendors = plugin.vendor();
-            if (vendors.length > 0) {
+            Plugin.Vendor vendor = plugin.vendor();
+            if (!vendor.name().isBlank() || !vendor.url().isBlank()) {
                 sb.append(",\n");
                 sb.append("  \"vendor\": {\n");
                 int fieldCount = 0;
-                for (Plugin.Vendor vendor : vendors) {
-                    if (!vendor.name().isBlank()) {
-                        if (fieldCount > 0) {
-                            sb.append(",\n");
-                        }
-                        sb.append("    \"name\": \"").append(escapeJson(vendor.name())).append("\"");
-                        fieldCount++;
+                if (!vendor.name().isBlank()) {
+                    sb.append("    \"name\": \"").append(escapeJson(vendor.name())).append("\"");
+                    fieldCount++;
+                }
+                if (!vendor.url().isBlank()) {
+                    if (fieldCount > 0) {
+                        sb.append(",\n");
                     }
-                    if (!vendor.url().isBlank()) {
-                        if (fieldCount > 0) {
-                            sb.append(",\n");
-                        }
-                        sb.append("    \"url\": \"").append(escapeJson(vendor.url())).append("\"");
-                        fieldCount++;
-                    }
+                    sb.append("    \"url\": \"").append(escapeJson(vendor.url())).append("\"");
                 }
                 sb.append("\n  }");
             }
@@ -206,7 +206,7 @@ public class PluginDescriptorProcessor extends AbstractProcessor {
 
             try {
                 if (!generated.compareAndSet(false, true)) {
-                    note(typeElement, "META-INF/plugin.json 已由同轮处理生成,跳过重复写入");
+                    error(typeElement, "同模块只能有一个 @Plugin 类（已为其他类生成了 META-INF/plugin.json）");
                     continue;
                 }
 

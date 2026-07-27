@@ -85,7 +85,7 @@ public @interface Plugin {
     /**
      * 插件厂商信息
      */
-    Vendor[] vendor() default {};
+    Vendor vendor() default @Vendor;
 
     /**
      * 插件依赖描述

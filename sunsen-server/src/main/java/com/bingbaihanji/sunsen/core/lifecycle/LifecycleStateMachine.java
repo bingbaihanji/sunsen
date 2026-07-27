@@ -55,13 +55,18 @@ public class LifecycleStateMachine {
     }
 
     /**
-     * 初始化插件状态
+     * 初始化插件状态.
+     * 若插件已在状态机中注册则抛出 IllegalStateException,防止并发加载覆盖状态条目.
      *
      * @param pluginId 插件 ID
      * @param initial  初始状态
+     * @throws IllegalStateException 插件已注册
      */
     public void init(String pluginId, PluginState initial) {
-        states.put(pluginId, new AtomicReference<>(initial));
+        AtomicReference<PluginState> existing = states.putIfAbsent(pluginId, new AtomicReference<>(initial));
+        if (existing != null) {
+            throw new IllegalStateException("插件 " + pluginId + " 已在状态机中注册");
+        }
     }
 
     /**

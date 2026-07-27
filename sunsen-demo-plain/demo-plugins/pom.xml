@@ -70,7 +70,7 @@
                                 <property name="demo.api.classes"
                                           value="${project.basedir}/../demo-api/target/classes"/>
                                 <property name="plugin.cp"
-                                          value="${demo.api.classes};${core.classes};${api.classes}"/>
+                                          value="${demo.api.classes}${path.separator}${core.classes}${path.separator}${api.classes}"/>
 
                                 <mkdir dir="${project.build.directory}/plugins"/>
 

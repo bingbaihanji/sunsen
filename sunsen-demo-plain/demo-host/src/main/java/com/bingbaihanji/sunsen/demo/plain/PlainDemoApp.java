@@ -148,7 +148,9 @@ public class PlainDemoApp {
         // 所以 "demo-plugins/target/plugins" 是首选路径。
         Path dir = Path.of("demo-plugins/target/plugins");
         if (!Files.exists(dir)) {
-            dir = Path.of("D:\\bingbaihanji\\Sunsen\\sunsen-demo-plain\\demo-plugins\\target\\plugins");
+            throw new IllegalStateException(
+                    "插件目录不存在: " + dir.toAbsolutePath().normalize()
+                            + "。请先执行 mvn install 构建 demo-plugins 模块。");
         }
         return dir.toAbsolutePath().normalize();
     }

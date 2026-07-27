@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-core/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-core/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-demo-plain/demo-api/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-demo-plain/demo-api/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-demo-plain/demo-host/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-demo-plain/demo-host/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-demo-plain/demo-plugins/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-demo-plain/demo-plugins/src/main/plugin-src" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-demo-plain/demo-plugins/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-demo-plain/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-demo-plain/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-server/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sunsen-server/src/main/resources" charset="UTF-8" />
+  </component>
+</project>
