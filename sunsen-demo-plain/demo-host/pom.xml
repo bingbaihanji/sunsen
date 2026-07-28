@@ -59,7 +59,7 @@
                         工作目录设置为 sunsen-demo-plain/，使 PlainDemoApp 中的相对路径
                         "demo-plugins/target/plugins" 能正确指向插件目录。
                     -->
-                    <workingDirectory>${project.parent.basedir}</workingDirectory>
+                    <workingDirectory>..</workingDirectory>
                 </configuration>
             </plugin>
         </plugins>

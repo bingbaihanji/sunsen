@@ -1,14 +1,13 @@
 package com.bingbaihanji.sunsen.core;
 
 import com.bingbaihanji.sunsen.api.PluginState;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -17,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author 冰白寒祭
  * @date 2025
  */
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 class PluginWatcherTest {
 
     @TempDir
@@ -100,21 +100,30 @@ class PluginWatcherTest {
 
         Path dest = pluginsDir.resolve("plugin-hello.jar");
         Files.copy(helloJar, dest);
-        Thread.sleep(1500);
-        assertEquals(PluginState.ACTIVE, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
 
-        // Release file locks before deleting (Windows requires this)
-        watcher.close();
+        // 轮询等待 watcher 自动加载并启动插件
+        long deadline = System.currentTimeMillis() + 5_000;
+        while (manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello") != PluginState.ACTIVE
+                && System.currentTimeMillis() < deadline) {
+            Thread.sleep(100);
+        }
+        assertEquals(PluginState.ACTIVE, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"),
+                "watcher 应自动加载并启动插件");
+
+        // Windows 上已加载的 JAR 会被 ClassLoader 占用，无法直接删除。
+        // 先手动 stop/unload 释放文件句柄，再删除 JAR，验证 watcher 后续不会重新加载。
         manager.stopPlugin("com.bingbaihanji.sunsen.core.test.hello");
         manager.unloadPlugin("com.bingbaihanji.sunsen.core.test.hello");
 
         Files.delete(dest);
 
-        // Recreate watcher to detect the deletion
-        watcher = new PluginWatcher(manager, pluginsDir);
-        Thread.sleep(1500);
+        deadline = System.currentTimeMillis() + 2_000;
+        while (System.currentTimeMillis() < deadline) {
+            Thread.sleep(100);
+        }
 
-        assertNull(manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"));
+        assertNull(manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"),
+                "卸载并删除 JAR 后插件应保持未加载状态");
     }
 
     @Test

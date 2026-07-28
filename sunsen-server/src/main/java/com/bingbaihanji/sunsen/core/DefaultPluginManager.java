@@ -306,13 +306,15 @@ public class DefaultPluginManager implements PluginManager {
                     Thread t = Thread.ofVirtual().start(() -> {
                         try {
                             loadSinglePlugin(descriptor, jarPath);
-                        } catch (Exception e) {
-                            waveErrors.add(new PluginLoadError(descriptor.id(), jarPath, e));
+                        } catch (Throwable e) {
+                            Throwable cause = e instanceof Exception ex ? ex
+                                    : new PluginLoadException("Plugin load failed with error", e);
+                            waveErrors.add(new PluginLoadError(descriptor.id(), jarPath, (Exception) cause));
                             LOGGER.log(System.Logger.Level.ERROR, () -> "Load plugin failed: " + descriptor.id(), e);
                             // 仅当状态机尚未置为 FAILED 时发布事件(executePhase 已处理的场合避免重复)
                             if (stateMachine.getState(descriptor.id()) != PluginState.FAILED) {
                                 stateMachine.forceSet(descriptor.id(), PluginState.FAILED);
-                                eventBus.publish(new PluginFailedEvent(descriptor, PluginState.CREATED, e));
+                                eventBus.publish(new PluginFailedEvent(descriptor, PluginState.CREATED, (Exception) cause));
                             }
                         }
                     });
@@ -440,6 +442,9 @@ public class DefaultPluginManager implements PluginManager {
             } catch (Exception e) {
                 stateMachine.remove(descriptor.id());
                 throw e;
+            } catch (Error err) {
+                stateMachine.remove(descriptor.id());
+                throw err;
             }
             rebuildTopology();
             return descriptor;
@@ -532,57 +537,41 @@ public class DefaultPluginManager implements PluginManager {
                 stopSinglePlugin(pluginId);
             }
 
-            // Phase 2: cleanup old plugin instance and atomically swap extension registry entries.
             Path oldJarPath = oldEntry.jarPath();
             PluginDescriptor oldDescriptor = oldEntry.descriptor();
 
-            // Phase 3: atomically unregister old extensions, destroy old instance and register new extensions
-            // inside a SINGLE write lock — readers never observe destroyed old extensions or an empty gap.
+            // Phase 2: atomically swap registry entries inside a SINGLE write lock.
+            // Lifecycle callbacks run in the current thread while holding the write lock.
+            // This is safe because ReentrantReadWriteLock allows the same thread to acquire
+            // the read lock (getExtensions) while holding the write lock, so plugins calling
+            // getExtensions() in onInit will not deadlock. The trade-off is that a hanging
+            // onInit blocks registry readers for its duration; this is preferable to a
+            // thread leak caused by spawning a separate worker thread inside the lock.
             try {
                 extensionRegistry.withWriteLock(() -> {
                     unregisterPluginFromRegistry(pluginId);
-                    cleanupPluginInstance(pluginId);
+                    plugins.remove(pluginId);
                     stateMachine.init(newDescriptor.id(), PluginState.CREATED);
-                    loadSinglePluginCore(newDescriptor, newJarPath);
+                    stateMachine.transition(pluginId, PluginState.CREATED, PluginState.RESOLVED);
+                    PluginEntry newEntry = loadPluginInstanceDirect(newDescriptor, newJarPath);
+                    registerPluginInRegistry(newEntry);
                 });
-            } catch (Exception loadException) {
-                // Rollback: try to restore old plugin from its original JAR
+            } catch (Exception e) {
                 LOGGER.log(System.Logger.Level.WARNING,
-                        () -> "Plugin reload failed for " + pluginId + ", attempting rollback to " + oldJarPath,
-                        loadException);
-                boolean rolledBack = false;
-                if (oldDescriptor != null && oldJarPath != null && Files.exists(oldJarPath)) {
-                    try {
-                        extensionRegistry.withWriteLock(() -> {
-                            stateMachine.remove(pluginId);
-                            stateMachine.init(pluginId, PluginState.CREATED);
-                            loadSinglePluginCore(oldDescriptor, oldJarPath);
-                        });
-                        startSinglePlugin(pluginId);
-                        if (stateMachine.getState(pluginId) == PluginState.ACTIVE) {
-                            rolledBack = true;
-                            LOGGER.log(System.Logger.Level.INFO,
-                                    () -> "Plugin " + pluginId + " successfully rolled back to " + oldJarPath);
-                        } else {
-                            LOGGER.log(System.Logger.Level.ERROR,
-                                    () -> "Rollback of plugin " + pluginId
-                                            + " loaded but failed to start (state="
-                                            + stateMachine.getState(pluginId) + ")");
-                        }
-                    } catch (Exception rollbackEx) {
-                        LOGGER.log(System.Logger.Level.ERROR,
-                                () -> "Rollback failed for plugin " + pluginId, rollbackEx);
-                        stateMachine.forceSet(pluginId, PluginState.FAILED);
-                        eventBus.publish(new PluginFailedEvent(oldDescriptor, PluginState.LOADED, rollbackEx));
-                    }
-                }
+                        () -> "Plugin reload failed for " + pluginId + ", attempting rollback to " + oldJarPath, e);
+                stateMachine.remove(pluginId);
+                boolean rolledBack = rollbackReload(pluginId, oldDescriptor, oldJarPath);
+                cleanupPluginInstanceEntry(oldEntry);
                 if (!rolledBack && oldDescriptor != null) {
                     eventBus.publish(new PluginUnloadedEvent(oldDescriptor));
                 }
-                throw new PluginLoadException("Plugin reload failed: " + pluginId, loadException);
+                throw new PluginLoadException("Plugin reload failed: " + pluginId, e);
             }
 
-            // Phase 4: publish lifecycle events outside registry write lock to avoid deadlock.
+            // Phase 3: outside lock, cleanup old instance (onDestroy, close ClassLoader)
+            cleanupPluginInstanceEntry(oldEntry);
+
+            // Phase 4: publish lifecycle events outside registry write lock.
             // Order must match normal load: Unloaded(old) → Loaded(new) → Started(new) → Reloaded.
             if (oldDescriptor != null) {
                 eventBus.publish(new PluginUnloadedEvent(oldDescriptor));
@@ -787,8 +776,24 @@ public class DefaultPluginManager implements PluginManager {
 
     /**
      * Core loading logic without publishing events.
+     *
+     * @return 创建完成的插件运行时条目
      */
-    private void loadSinglePluginCore(PluginDescriptor descriptor, Path jarPath) {
+    private PluginEntry loadSinglePluginCore(PluginDescriptor descriptor, Path jarPath) {
+        PluginEntry entry = loadPluginInstanceOnly(descriptor, jarPath);
+        registerPluginInRegistry(entry);
+        return entry;
+    }
+
+    /**
+     * 创建插件实例并执行 onInit，但不扫描/注册扩展，也不加入 plugins map。
+     * 调用方需保证状态机已初始化到 CREATED。
+     *
+     * @param descriptor 插件描述符
+     * @param jarPath    插件 JAR 路径
+     * @return 包含实例、ClassLoader、Context 的候选条目
+     */
+    private PluginEntry loadPluginInstanceOnly(PluginDescriptor descriptor, Path jarPath) {
         String pluginId = descriptor.id();
 
         // apiVersion compatibility check: major version must match
@@ -855,31 +860,131 @@ public class DefaultPluginManager implements PluginManager {
                     () -> executeWithTimeout(() -> pluginInstance.onInit(context), pluginId, "onInit", classLoader),
                     descriptor, PluginState.RESOLVED);
 
-            // Scan extensions
-            extensionScanner.scan(descriptor, classLoader);
-
-            PluginEntry newEntry = new PluginEntry(descriptor, pluginInstance, classLoader, context, jarPath, threadGroup);
-            PluginEntry existing = plugins.putIfAbsent(pluginId, newEntry);
-            if (existing != null) {
-                // 并发加载同 ID 插件,关闭冗余 ClassLoader 避免泄漏
-                try {
-                    classLoader.close();
-                } catch (IOException ignored) {
-                }
-                throw new PluginLoadException("插件 " + pluginId + " 已被并发加载");
-            }
-            stateMachine.transition(pluginId, PluginState.RESOLVED, PluginState.LOADED);
+            return new PluginEntry(descriptor, pluginInstance, classLoader, context, jarPath, threadGroup);
         } catch (Exception e) {
-            // 清理已注册的扩展，防止残留"死实例"（ClassLoader 即将关闭）
-            extensionRegistry.unregisterPlugin(pluginId);
-            if (contextHolder[0] != null) {
-                contextHolder[0].unsubscribeAll();
+            cleanupFailedLoad(pluginId, contextHolder[0], classLoader);
+            throw e;
+        } catch (Error err) {
+            cleanupFailedLoad(pluginId, contextHolder[0], classLoader);
+            throw err;
+        }
+    }
+
+    /**
+     * 在当前线程中完成插件实例化与 onInit，不切换工作线程。
+     * 用于热重载/回滚路径：调用方已持有 registry 写锁，当前线程可直接获取读锁，
+     * 避免 spawn 新线程后因读锁不可中断导致的死锁/线程泄漏。
+     */
+    private PluginEntry loadPluginInstanceDirect(PluginDescriptor descriptor, Path jarPath) {
+        String pluginId = descriptor.id();
+
+        if (!isApiVersionCompatible(descriptor.apiVersion())) {
+            throw new PluginLoadException(
+                    "Plugin " + pluginId + " apiVersion (" + descriptor.apiVersion()
+                            + ") is incompatible with framework API version (" + SunsenVersion.API_VERSION + ")"
+            );
+        }
+
+        List<PluginClassLoader> depLoaders = new ArrayList<>();
+        for (DependencyDescriptor dep : descriptor.dependencies()) {
+            PluginEntry depEntry = plugins.get(dep.id());
+            if (depEntry != null && depEntry.classLoader() != null) {
+                depLoaders.add(depEntry.classLoader());
+            } else if (!dep.optional()) {
+                PluginState depState = stateMachine.getState(dep.id());
+                String reason = depState == PluginState.FAILED
+                        ? "required dependency '" + dep.id() + "' failed to load"
+                        : "required dependency '" + dep.id() + "' is not loaded";
+                throw new PluginLoadException("Cannot load plugin '" + pluginId + "': " + reason);
             }
+        }
+
+        URL jarUrl;
+        try {
+            jarUrl = jarPath.toUri().toURL();
+        } catch (MalformedURLException e) {
+            throw new PluginLoadException("Invalid JAR path: " + jarPath, e);
+        }
+
+        PluginClassLoader classLoader = new PluginClassLoader(
+                new URL[]{jarUrl}, parentClassLoader, descriptor.packagePrefixes(), depLoaders
+        );
+
+        DefaultPluginContext[] contextHolder = new DefaultPluginContext[1];
+        try {
+            Class<?> mainClass = classLoader.loadClass(descriptor.mainClass());
+            Plugin pluginInstance = (Plugin) mainClass.getDeclaredConstructor().newInstance();
+
+            Path workDir = pluginsDir.resolve(pluginId);
+            try {
+                Files.createDirectories(workDir);
+            } catch (IOException e) {
+                LOGGER.log(System.Logger.Level.WARNING, () -> "Cannot create work directory: " + workDir, e);
+            }
+
+            ThreadGroup threadGroup = new ThreadGroup("plugin-" + pluginId);
+            DefaultPluginContext context = new DefaultPluginContext(
+                    descriptor, extensionRegistry, eventBus, this, workDir, threadGroup
+            );
+            contextHolder[0] = context;
+
+            ClassLoader prev = Thread.currentThread().getContextClassLoader();
+            Thread.currentThread().setContextClassLoader(classLoader);
+            try {
+                pluginInstance.onInit(context);
+            } finally {
+                Thread.currentThread().setContextClassLoader(prev);
+            }
+
+            return new PluginEntry(descriptor, pluginInstance, classLoader, context, jarPath, threadGroup);
+        } catch (Exception e) {
+            stateMachine.forceSet(pluginId, PluginState.FAILED);
+            cleanupFailedLoad(pluginId, contextHolder[0], classLoader);
+            throw new PluginLoadException("Cannot initialize plugin: " + pluginId, e);
+        } catch (Error err) {
+            stateMachine.forceSet(pluginId, PluginState.FAILED);
+            cleanupFailedLoad(pluginId, contextHolder[0], classLoader);
+            throw err;
+        }
+    }
+
+    /**
+     * 将已完成 onInit 的插件条目注册到注册表：扫描扩展、加入 plugins map、状态转 LOADED。
+     * 本方法不自行加注册表写锁，调用方需根据场景决定是否在外层加锁。
+     * 热重载路径会在同一把写锁内先注销旧扩展再调用本方法，以保证原子窗口。
+     */
+    private void registerPluginInRegistry(PluginEntry entry) {
+        String pluginId = entry.descriptor().id();
+        extensionScanner.scan(entry.descriptor(), entry.classLoader());
+        PluginEntry existing = plugins.putIfAbsent(pluginId, entry);
+        if (existing != null) {
+            // 并发加载同 ID 插件，关闭冗余 ClassLoader 避免泄漏
+            try {
+                entry.classLoader().close();
+            } catch (IOException ignored) {
+            }
+            throw new PluginLoadException("插件 " + pluginId + " 已被并发加载");
+        }
+        stateMachine.transition(pluginId, PluginState.RESOLVED, PluginState.LOADED);
+    }
+
+    /**
+     * 加载失败后的统一清理：强制 FAILED、注销扩展、取消订阅、关闭 ClassLoader。
+     */
+    private void cleanupFailedLoad(String pluginId, DefaultPluginContext context, PluginClassLoader classLoader) {
+        PluginState state = stateMachine.getState(pluginId);
+        if (state != null && state != PluginState.FAILED && state != PluginState.UNLOADED) {
+            stateMachine.forceSet(pluginId, PluginState.FAILED);
+        }
+        extensionRegistry.unregisterPlugin(pluginId);
+        if (context != null) {
+            context.unsubscribeAll();
+        }
+        if (classLoader != null) {
             try {
                 classLoader.close();
             } catch (IOException ignored) {
             }
-            throw e;
         }
     }
 
@@ -949,16 +1054,27 @@ public class DefaultPluginManager implements PluginManager {
      * @return 被清理的插件描述符,插件不存在时返回 null
      */
     private PluginDescriptor cleanupPluginInstance(String pluginId) {
-        PluginEntry entry = plugins.get(pluginId);
+        PluginEntry entry = plugins.remove(pluginId);
         if (entry == null) {
             return null;
         }
+        cleanupPluginInstanceEntry(entry);
+        return entry.descriptor();
+    }
+
+    /**
+     * 清理指定插件条目的实例资源，不操作 plugins map。
+     */
+    private void cleanupPluginInstanceEntry(PluginEntry entry) {
+        String pluginId = entry.descriptor().id();
 
         // 1. invoke onDestroy callback (with timeout protection)
         try {
             executeWithTimeout(entry.plugin()::onDestroy, pluginId, "onDestroy", entry.classLoader());
         } catch (Exception e) {
             LOGGER.log(System.Logger.Level.WARNING, () -> "Plugin onDestroy error: " + pluginId, e);
+        } catch (Error err) {
+            LOGGER.log(System.Logger.Level.WARNING, () -> "Plugin onDestroy error: " + pluginId, err);
         }
 
         // 2. interrupt all threads created via the plugin's ThreadFactory
@@ -968,17 +1084,49 @@ public class DefaultPluginManager implements PluginManager {
         entry.context().unsubscribeAll();
         eventBus.unsubscribeAll(pluginId);
 
-        // 4. remove from plugin map, completely invisible externally
-        plugins.remove(pluginId);
-
-        // 5. close ClassLoader, release JAR file handle
+        // 4. close ClassLoader, release JAR file handle
         try {
             entry.classLoader().close();
         } catch (Exception e) {
             LOGGER.log(System.Logger.Level.WARNING, () -> "Close ClassLoader error: " + pluginId, e);
         }
+    }
 
-        return entry.descriptor();
+    /**
+     * 热重载失败时尝试回滚到旧版本。
+     *
+     * @return 是否成功回滚到 ACTIVE 状态
+     */
+    private boolean rollbackReload(String pluginId, PluginDescriptor oldDescriptor, Path oldJarPath) {
+        if (oldDescriptor == null || oldJarPath == null || !Files.exists(oldJarPath)) {
+            return false;
+        }
+        try {
+            extensionRegistry.withWriteLock(() -> {
+                stateMachine.remove(pluginId);
+                stateMachine.init(pluginId, PluginState.CREATED);
+                stateMachine.transition(pluginId, PluginState.CREATED, PluginState.RESOLVED);
+                PluginEntry rolledEntry = loadPluginInstanceDirect(oldDescriptor, oldJarPath);
+                registerPluginInRegistry(rolledEntry);
+            });
+            startSinglePlugin(pluginId);
+            if (stateMachine.getState(pluginId) == PluginState.ACTIVE) {
+                LOGGER.log(System.Logger.Level.INFO,
+                        () -> "Plugin " + pluginId + " successfully rolled back to " + oldJarPath);
+                return true;
+            } else {
+                LOGGER.log(System.Logger.Level.ERROR,
+                        () -> "Rollback of plugin " + pluginId + " loaded but failed to start (state="
+                                + stateMachine.getState(pluginId) + ")");
+                return false;
+            }
+        } catch (Throwable t) {
+            LOGGER.log(System.Logger.Level.ERROR, () -> "Rollback failed for plugin " + pluginId, t);
+            stateMachine.forceSet(pluginId, PluginState.FAILED);
+            Exception cause = t instanceof Exception ex ? ex : new PluginLoadException("Rollback failed with error", t);
+            eventBus.publish(new PluginFailedEvent(oldDescriptor, PluginState.LOADED, cause));
+            return false;
+        }
     }
 
     /**
