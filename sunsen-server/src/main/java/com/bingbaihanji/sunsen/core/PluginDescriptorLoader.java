@@ -14,7 +14,11 @@ import java.util.jar.JarFile;
 import java.util.regex.Pattern;
 
 /**
- * 从插件 JAR 中读取 {@code META-INF/plugin.json} 并解析为 {@link PluginDescriptor}
+ * 从插件 JAR 中读取 {@code META-INF/plugin.json} 与可选的 {@code META-INF/plugin-metadata.json},
+ * 并解析为 {@link PluginDescriptor}
+ * <p>
+ * {@code META-INF/plugin.json} 为必填描述文件;{@code META-INF/plugin-metadata.json} 为可选的结构化元数据资源,
+ * 当 {@code plugin.json} 未提供 {@code metadata} 字段时作为元数据来源。
  *
  * @author 冰白寒祭
  * @date 2025
@@ -23,6 +27,10 @@ public final class PluginDescriptorLoader {
 
     // 插件描述文件在 JAR 中的固定路径
     private static final String PLUGIN_JSON = "META-INF/plugin.json";
+    // 结构化元数据资源在 JAR 中的约定路径
+    private static final String PLUGIN_METADATA_JSON = "META-INF/plugin-metadata.json";
+    // 日志记录器
+    private static final System.Logger LOGGER = System.getLogger(PluginDescriptorLoader.class.getName());
     // JSON 解析器
     private static final ObjectMapper MAPPER = new ObjectMapper();
     // 合法 Java 包名正则
@@ -53,7 +61,7 @@ public final class PluginDescriptorLoader {
                 if (root == null || !root.isObject()) {
                     throw new PluginLoadException("plugin.json must be a JSON object: " + jarPath);
                 }
-                return parse(root);
+                return parse(root, readMetadataResource(jarFile));
             }
         } catch (IOException e) {
             throw new PluginLoadException("Cannot read plugin descriptor: " + jarPath, e);
@@ -67,6 +75,17 @@ public final class PluginDescriptorLoader {
      * @return 解析后的插件描述符
      */
     static PluginDescriptor parse(JsonNode root) {
+        return parse(root, null);
+    }
+
+    /**
+     * 从 JSON 节点解析插件描述符,并合并已读取的资源元数据.
+     *
+     * @param root                 plugin.json 对应的 JSON 节点
+     * @param resourceMetadataJson 已读取的 {@code META-INF/plugin-metadata.json} 文本;null 表示无
+     * @return 解析后的插件描述符
+     */
+    static PluginDescriptor parse(JsonNode root, String resourceMetadataJson) {
         require(root, "id");
         require(root, "name");
         require(root, "version");
@@ -122,6 +141,42 @@ public final class PluginDescriptorLoader {
             }
         }
 
+        Map<String, String> mappings = new LinkedHashMap<>();
+        JsonNode mappingsNode = root.get("mappings");
+        if (mappingsNode != null && !mappingsNode.isNull()) {
+            if (!mappingsNode.isObject()) {
+                throw new PluginLoadException("plugin.json mappings must be a JSON object");
+            }
+            Iterator<Map.Entry<String, JsonNode>> fields = mappingsNode.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> field = fields.next();
+                if (field.getKey().isBlank()) {
+                    throw new PluginLoadException("plugin.json mappings key must not be blank");
+                }
+                if (!field.getValue().isTextual()) {
+                    throw new PluginLoadException(
+                            "plugin.json mappings value must be a string: " + field.getKey());
+                }
+                mappings.put(field.getKey(), field.getValue().asText());
+            }
+        }
+
+        String metadataJson = "";
+        JsonNode metadataNode = root.get("metadata");
+        if (metadataNode != null && !metadataNode.isNull()) {
+            if (!metadataNode.isObject()) {
+                throw new PluginLoadException("plugin.json metadata must be a JSON object");
+            }
+            metadataJson = metadataNode.toString();
+            if (resourceMetadataJson != null) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "plugin.json metadata overrides " + PLUGIN_METADATA_JSON
+                                + " for plugin '" + id + "'");
+            }
+        } else if (resourceMetadataJson != null) {
+            metadataJson = resourceMetadataJson;
+        }
+
         Set<String> permissions = new HashSet<>();
         if (root.has("permissions")) {
             JsonNode permsNode = root.get("permissions");
@@ -147,8 +202,36 @@ public final class PluginDescriptorLoader {
 
         return new PluginDescriptor(
                 id, name, description, version, apiVersion, mainClass,
-                packagePrefixes, dependencies, permissions, vendorInfo
+                packagePrefixes, dependencies, permissions, vendorInfo,
+                mappings, metadataJson
         );
+    }
+
+    /**
+     * 读取并校验 {@code META-INF/plugin-metadata.json}.
+     *
+     * @param jarFile 已打开的插件 JAR
+     * @return 规范化后的 JSON 文本;资源不存在或为空时返回 null
+     */
+    private static String readMetadataResource(JarFile jarFile) {
+        var entry = jarFile.getJarEntry(PLUGIN_METADATA_JSON);
+        if (entry == null) {
+            return null;
+        }
+        try (InputStream is = jarFile.getInputStream(entry)) {
+            JsonNode root = MAPPER.readTree(is);
+            if (root == null || root.isMissingNode()) {
+                return null;
+            }
+            if (!root.isObject()) {
+                throw new PluginLoadException(
+                        PLUGIN_METADATA_JSON + " in " + jarFile.getName() + " must be a JSON object");
+            }
+            return root.toString();
+        } catch (IOException e) {
+            throw new PluginLoadException(
+                    "Cannot read " + PLUGIN_METADATA_JSON + " in " + jarFile.getName(), e);
+        }
     }
 
     /**

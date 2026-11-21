@@ -27,12 +27,14 @@ public interface PluginContext {
     Path getPluginWorkDir();
 
     /**
-     * 读取当前插件的配置项
+     * 读取当前插件的配置项.查找顺序:{@code config.properties} &gt; {@link PluginDescriptor#mappings()},
+     * 都不存在返回 {@code null}.空字符串视为已配置,原样返回.
      */
     String getProperty(String key);
 
     /**
-     * 读取当前插件的配置项,带默认值
+     * 读取当前插件的配置项,带默认值.查找顺序:{@code config.properties} &gt;
+     * {@link PluginDescriptor#mappings()} &gt; {@code defaultValue}.空字符串视为已配置,原样返回.
      */
     String getProperty(String key, String defaultValue);
 

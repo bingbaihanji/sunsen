@@ -59,7 +59,7 @@ LOGO:
 │  Plugin 接口 / 注解体系 / PluginContext / 事件契约    │
 ├─────────────────────────────────────────────────────┤
 │              插件开发模块 (sunsen-api)                │
-│           插件开发便利类与工具（预留）                 │
+│            插件开发便利类与工具（已实现）             │
 ├─────────────────────────────────────────────────────┤
 │                 插件实现 (Plugins)                    │
 │    Plugin A     │    Plugin B    │    Plugin C       │
@@ -99,6 +99,9 @@ sunsen/
 │   │       ├── PluginStartedEvent.java
 │   │       ├── PluginStoppedEvent.java
 │   │       ├── PluginUnloadedEvent.java
+│   │       ├── PluginInstalledEvent.java
+│   │       ├── PluginUninstalledEvent.java
+│   │       ├── PluginReloadedEvent.java
 │   │       └── PluginFailedEvent.java
 │   └── ... (异常类)
 ├── sunsen-api/                        ← 插件开发模块
@@ -112,6 +115,7 @@ sunsen/
 │   ├── PluginDescriptorLoader.java
 │   ├── DependencyResolver.java
 │   ├── PluginEventBus.java
+│   ├── PluginWatcher.java
 │   ├── lifecycle/
 │   │   └── LifecycleStateMachine.java
 │   ├── version/
@@ -148,7 +152,8 @@ sunsen/
 
 **卸载**：插件进入 `UNLOADED` 后，框架会调用 `classLoader.close()` 释放 JAR 句柄，然后解除强引用，等 GC 回收。
 
-**热重载时的 ClassLoader 更新**：如果插件 A 依赖插件 B，B 热重载后，A 的 `PluginClassLoader` 里的依赖引用会自动更新到新版本。
+**热重载时的 ClassLoader 更新**：`PluginClassLoader.updateDependencyLoaders()` 预留了依赖引用更新能力，但当前 `reloadPlugin()`
+禁止重载被其他插件依赖的插件，因此该路径不会被触发。需要升级被依赖插件时，应先卸载依赖方，再重载/替换被依赖插件。
 
 ### 3.2 扩展点与扩展
 
@@ -185,26 +190,21 @@ public class LogTaskHandler implements TaskHandler {
 校验该扩展点的实现数量不能超过 1 个，否则加载失败。跨插件的多个实现是允许的。
 
 **`sole = true`**：如果扩展点设置了 `sole = true`，框架会确保 **整个系统**中只有一个插件的实现被注册。当多个插件都提供了实现时，框架打印警告并只保留
-`@Extension(order)` 最小（优先级最高）的一个。被舍弃的实现会从注册表中移除，且即使竞争方后续卸载也不会自动恢复。适用于数据库驱动、认证后端等低频变更的基础设施选择。
+`@Extension(order)` 最小（优先级最高）的一个。落选的实现会进入候选列表；当胜者所在插件卸载后，优先级次高的候选会自动递补（若候选也已卸载则清空）。
+适用于数据库驱动、认证后端等低频变更的基础设施选择。
 
 宿主通过 `pluginManager.getExtensions(TaskHandler.class)` 获取按 `@Extension.order` 排好序的扩展实例列表。
 
 ### 3.3 生命周期状态机
 
 ```
-               ┌─── JAR 扫描 + 描述文件解析 ───┐
-               ▼                              │
            CREATED ──verify()──> RESOLVED ──load()──> LOADED
                │                    │            │
           (解析失败)            (依赖缺失)    (类加载/onInit失败)
                │                    │            │
                └────────────────────┴──> FAILED  │
-                                                  │
-                           STOPPED ◄──────────────┘
-                           │    ▲     (首次加载等同于 STOPPED → start())
-                        start() │ stop()
-                           │    │
-                           ▼    │
+                                                  │  LOADED / STOPPED 均可 start()
+                                                  ▼
                         STARTING ──(onStart 异常)──> FAILED
                            │
                      (onStart 正常返回)
@@ -217,11 +217,11 @@ public class LogTaskHandler implements TaskHandler {
                                                 ▼
                                             STOPPED ──unload()──> UNLOADED(终态)
                                                │
-                                           (热重载)
+                                           (热重载 / 重启)
                                          start() 重新进入 STARTING
 
-
             FAILED ──unload()──> UNLOADED(强制清理)
+            其余非 UNLOADED 状态 ──unload()──> UNLOADED
 ```
 
 | 状态       | 含义                                                     |
@@ -255,7 +255,9 @@ public class LogTaskHandler implements TaskHandler {
 1. **存在性校验**：非 optional 的依赖必须能找到对应的插件
 2. **版本约束校验**：支持 `>=1.0.0 <2.0.0`、`^1.2.0`、`~1.2.0`、`=1.0.0`、`>1.0.0`、`<2.0.0`、`!=1.0.0` 以及精确版本
 3. **循环依赖检测**：DFS 检测环路，发现就抛 `CircularDependencyException`
-4. **拓扑排序**：Kahn 算法生成加载和启动顺序，保证依赖方在后
+4. **拓扑排序**：Kahn 算法生成加载和启动顺序，保证依赖方在后。`sortByLevels()` 额外输出分层波次，同一波次内的插件互不依赖，`loadPlugins()` 会用虚拟线程并行加载
+
+加载、启动、停止、销毁四个生命周期阶段均受 `lifecycleTimeoutMs`（默认 30 秒）超时保护；`unloadPlugins()` 对处于 `STARTING` 的插件有 `startingDrainTimeoutMs`（默认 5 秒）的排空等待窗口。
 
 ### 3.5 插件描述文件
 
@@ -267,7 +269,7 @@ public class LogTaskHandler implements TaskHandler {
   "name": "Data Cleaner",
   "description": "提供数据清洗与格式转换能力",
   "version": "1.2.0",
-  "apiVersion": "1.0",
+  "apiVersion": "1.1",
   "vendor": {
     "name": "Example Corp",
     "url": "https://example.com"
@@ -302,6 +304,61 @@ public class LogTaskHandler implements TaskHandler {
 | `packagePrefixes` | 是   | 插件私有包前缀，类隔离的核心配置                                                                     |
 | `dependencies`    | 否   | 依赖列表，支持版本约束和 optional 标记                                                               |
 | `permissions`     | 否   | 运行时权限声明                                                                                       |
+| `mappings`        | 否   | 扁平默认参数，字符串键值对；解析为 `PluginDescriptor.mappings()`                                     |
+| `metadata`        | 否   | 结构化元数据 JSON 对象；也可放在 `META-INF/plugin-metadata.json`                                     |
+
+### 3.6 插件参数与元数据
+
+**扁平默认参数**通过 `@Plugin.mappings` 声明，编译期生成到 `plugin.json`：
+
+```java
+@Plugin(
+        id = "com.example.web",
+        name = "Web Plugin",
+        version = "1.0.0",
+        packagePrefixes = "com.example.web",
+        mappings = {
+                @Plugin.KeyValue(key = "web.basePath", value = "/api"),
+                @Plugin.KeyValue(key = "web.auth.enabled", value = "true")
+        }
+)
+public class WebPlugin extends AbstractPlugin {
+}
+```
+
+使用手写 `plugin.json` 时注解 `mappings` 不生效；注解 key 为空或重复会编译报错；手写 `mappings` 必须是字符串值对象，
+否则加载失败。
+
+**结构化元数据**放在 `META-INF/plugin-metadata.json`（推荐）或手写 `plugin.json` 的 `"metadata"` 字段：
+
+```json
+{
+  "menus": [
+    { "id": "system", "title": "系统管理", "children": [] }
+  ],
+  "rolePermissions": [
+    { "code": "system:user:list", "name": "查看用户" }
+  ]
+}
+```
+
+同时存在时 `plugin.json.metadata` 覆盖资源并打印 WARNING；但 `META-INF/plugin-metadata.json` 仍会被读取和校验，
+资源不是 JSON 对象或解析失败时插件加载失败。框架只校验元数据是 JSON 对象，不解析内部结构；宿主可通过
+`PluginDescriptor.metadataJson()` 取得规范化后的 JSON 文本（`JsonNode.toString()` 紧凑格式，不保证与 JAR 内原文
+逐字节一致），再用 Jackson / Spring 绑定到自己的 DTO。
+
+元数据来自插件 JAR，属于不可信输入，宿主在绑定或使用前应自行校验。
+
+**参数优先级**：
+
+```
+pluginsDir/<pluginId>/config.properties  >  PluginDescriptor.mappings()  >  方法默认值
+```
+
+`PluginContext.getProperty`、`PluginProperties`、`AbstractPlugin.property` 均遵循该顺序。空字符串视为已配置：
+`getProperty` / `PluginProperties.getString` 原样返回空串，不回退 `PluginDescriptor.mappings()` / 方法默认值；
+`PluginProperties` 的 `getInt` 等类型化方法仍按空白缺失处理。无默认值重载在 `config.properties` 与
+`PluginDescriptor.mappings()` 均缺失时返回 `null`。
 
 ---
 
@@ -325,14 +382,14 @@ public @interface ExtensionPoint {
 
     /**
      * 是否允许多个扩展实现同时存在。
-     * false 时框架会校验同一插件内该扩展点的实现数量恰好为 1，否则拒绝启动。
+     * false 时框架会校验同一插件内该扩展点的实现数量不能超过 1，否则拒绝加载。
      */
     boolean allowMultiple() default true;
 
     /**
      * 是否要求整个系统中只有一个插件实现此扩展点。
      * true 时若多个插件提供了实现，框架打印警告并只保留 order 最小（优先级最高）的一个。
-     * 被舍弃的实现不会自动恢复，适用于数据库驱动等低频变更场景。
+     * 被舍弃的实现进入候选列表，胜者卸载后次优先候选自动递补。适用于数据库驱动等低频变更场景。
      */
     boolean sole() default false;
 }
@@ -391,12 +448,8 @@ public class DbTaskHandler implements TaskHandler {
 
 ```java
 // 按 order 升序，依次拿到 LogTaskHandler(10) 和 DbTaskHandler(20)
-pluginManager.getExtensions(TaskHandler .class)
-             .
-
-forEach(h ->h.
-
-handle(task));
+pluginManager.getExtensions(TaskHandler.class)
+             .forEach(h -> h.handle(task));
 ```
 
 ---
@@ -406,10 +459,12 @@ handle(task));
 ### `PluginManager`
 
 ```java
-public interface PluginManager {
+public interface PluginManager extends AutoCloseable {
 
     // 批量操作
     void loadPlugins();
+
+    List<PluginLoadError> loadPluginsWithResult();
 
     void startPlugins();
 
@@ -428,10 +483,20 @@ public interface PluginManager {
 
     void reloadPlugin(String pluginId, Path newJarPath);
 
+    void reloadPlugin(String pluginId);
+
+    void installPlugin(Path source);
+
+    void uninstallPlugin(String pluginId);
+
     // 查询
     Optional<PluginDescriptor> getPlugin(String pluginId);
 
     List<PluginDescriptor> getPlugins();
+
+    List<PluginDescriptor> getPlugins(PluginState state);   // default
+
+    boolean isPluginActive(String pluginId);                // default
 
     PluginState getPluginState(String pluginId);
 
@@ -440,6 +505,8 @@ public interface PluginManager {
 
     <T> Optional<T> getExtension(Class<T> extensionPoint, String extensionId);
 
+    <T> List<ExtensionInfo> getExtensionInfos(Class<T> extensionPoint);
+
     // 事件总线
     void publishEvent(PluginEvent event);
 
@@ -447,8 +514,12 @@ public interface PluginManager {
 
     <T extends PluginEvent> void unsubscribe(Class<T> eventType, PluginEventListener<T> listener);
 
-    // 钩子
+    // 钩子与关闭
     void setExtensionRegistrar(ExtensionRegistrar registrar);
+
+    @Override
+    default void close() {   // stopPlugins() + unloadPlugins()
+    }
 }
 ```
 
@@ -466,7 +537,13 @@ public interface PluginContext {
 
     String getProperty(String key, String defaultValue);
 
+    void reloadConfig();
+
     <T> List<T> getExtensions(Class<T> extensionPoint);
+
+    <T> Optional<T> getExtension(Class<T> extensionPoint, String extensionId);
+
+    <T> List<ExtensionInfo> getExtensionInfos(Class<T> extensionPoint);
 
     void publishEvent(PluginEvent event);
 
@@ -474,7 +551,10 @@ public interface PluginContext {
 
     <T extends PluginEvent> void unsubscribe(Class<T> eventType, PluginEventListener<T> listener);
 
+    // 返回受限视图：插件只能查询，不能启停/安装/卸载其他插件
     PluginManager getPluginManager();
+
+    ThreadFactory getThreadFactory();
 }
 ```
 
@@ -494,8 +574,8 @@ public interface ExtensionRegistrar {
 
 ### `PluginDescriptor`
 
-对应 `plugin.json` 的内存模型，是一个 Java `record`，加载后不可变。所有集合字段都做了防御性复制（`List.copyOf` /
-`Set.copyOf` / `Map.copyOf`）。
+对应 `META-INF/plugin.json` 与可选的 `META-INF/plugin-metadata.json` 的内存模型，是一个 Java `record`，加载后不可变。
+所有集合字段都做了防御性复制（`List.copyOf` / `Set.copyOf` / `Map.copyOf`）。
 
 ```java
 public record PluginDescriptor(
@@ -508,7 +588,9 @@ public record PluginDescriptor(
         List<String> packagePrefixes,
         List<DependencyDescriptor> dependencies,
         Set<String> permissions,
-        Map<String, String> vendorInfo
+        Map<String, String> vendorInfo,
+        Map<String, String> mappings,
+        String metadataJson
 ) {
 }
 
@@ -516,7 +598,11 @@ public record DependencyDescriptor(String id, String versionConstraint, boolean 
 }
 ```
 
-**相等性语义**：`PluginDescriptor.equals()` 只比较 `id` 和 `version`，方便同一插件不同版本的比较和替换。
+保留原 10 参构造器；`mappings` 为空 Map、`metadataJson` 为空串时表示旧插件未声明配置。
+
+**相等性语义**：`PluginDescriptor` 是 record，默认 `equals()` / `hashCode()` 比较全部字段；
+同一插件的不同版本或不同配置会被视为不同描述符。
+需要按 `id + version` 比较时应显式比较这两个字段。
 
 ---
 
@@ -539,13 +625,16 @@ public interface PluginEventListener<T extends PluginEvent> {
 
 ### 内置生命周期事件
 
-| 事件类                | 触发时机                                          |
-|-----------------------|---------------------------------------------------|
-| `PluginLoadedEvent`   | 插件进入 `LOADED` 状态（`@Extension` 扫描完成后） |
-| `PluginStartedEvent`  | 插件进入 `ACTIVE` 状态                            |
-| `PluginStoppedEvent`  | 插件进入 `STOPPED` 状态                           |
-| `PluginUnloadedEvent` | 插件进入 `UNLOADED` 状态（ClassLoader 释放前）    |
-| `PluginFailedEvent`   | 插件进入 `FAILED` 状态，携带 `Throwable cause`    |
+| 事件类                    | 触发时机                                           |
+|---------------------------|----------------------------------------------------|
+| `PluginLoadedEvent`       | 插件进入 `LOADED` 状态（`@Extension` 扫描完成后）  |
+| `PluginStartedEvent`      | 插件进入 `ACTIVE` 状态                             |
+| `PluginStoppedEvent`      | 插件进入 `STOPPED` 状态                            |
+| `PluginUnloadedEvent`     | 插件完成卸载（`onDestroy` 已调用、ClassLoader 已关闭） |
+| `PluginInstalledEvent`    | `installPlugin()` 成功（复制 + 加载 + 启动）       |
+| `PluginUninstalledEvent`  | `uninstallPlugin()` 成功（停止 + 卸载 + 删除 JAR） |
+| `PluginReloadedEvent`     | 热重载成功，携带新旧两个描述符                     |
+| `PluginFailedEvent`       | 插件进入 `FAILED` 状态，携带 `Throwable cause`     |
 
 ### 订阅事件
 
@@ -553,8 +642,16 @@ public interface PluginEventListener<T extends PluginEvent> {
 
 ```java
 public class MyPlugin implements Plugin {
+    private PluginContext context;
+
     @Override
     public void onInit(PluginContext context) {
+        this.context = context;   // 只保存上下文、读配置，不注册监听器
+    }
+
+    @Override
+    public void onStart() {
+        // 此时所有扩展已就绪，注册事件监听安全
         context.subscribe(PluginStartedEvent.class, event ->
                 System.out.println("Plugin started: " + event.getSourcePluginId())
         );
@@ -568,16 +665,10 @@ public class MyPlugin implements Plugin {
 **方式二：通过 `PluginManager` 宿主级订阅**
 
 ```java
-pluginManager.subscribe(PluginFailedEvent .class, event ->{
-        log.
-
-error("Plugin {} failed: {}",event.getSourcePluginId(),event.
-
-getCause().
-
-getMessage());
-
-alertOncall(event);
+pluginManager.subscribe(PluginFailedEvent.class, event -> {
+    log.error("Plugin {} failed: {}", event.getSourcePluginId(),
+            event.getCause().getMessage());
+    alertOncall(event);
 });
 ```
 
@@ -597,17 +688,12 @@ public class OrderCreatedEvent implements PluginEvent {
 }
 
 // 插件 A 发布事件
-context.
+context.publishEvent(new OrderCreatedEvent(order));
 
-publishEvent(new OrderCreatedEvent(order));
-
-// 插件 B 订阅（在 onInit 里注册）
-        context.
-
-subscribe(OrderCreatedEvent .class, event ->{
-
-sendNotification(event.getOrder());
-        });
+// 插件 B 订阅（在 onStart 里注册）
+context.subscribe(OrderCreatedEvent.class, event -> {
+    sendNotification(event.getOrder());
+});
 ```
 
 ### 线程模型
@@ -630,31 +716,34 @@ DefaultPluginManager manager = new DefaultPluginManager(new PluginEventBus(execu
 
 ### 执行流程
 
-调用 `pluginManager.reloadPlugin("com.example.plugin.cleaner", newJarPath)` 时，框架按以下顺序原子执行：
+调用 `pluginManager.reloadPlugin("com.example.plugin.cleaner", newJarPath)` 时，框架执行以下序列：
 
 ```
-① 获取 ExtensionRegistry 写锁
-② 调用 plugin.onStop()           → ACTIVE → STOPPING → STOPPED
-③ 调用 plugin.onDestroy()        → STOPPED → UNLOADED
-④ 注销该插件所有扩展
-   └─ 对每个扩展实例调用 ExtensionRegistrar.afterExtensionDestroyed()
-⑤ 取消该插件所有事件订阅
-⑥ 释放旧 PluginClassLoader
-⑦ 用新 JAR 创建新 PluginClassLoader
-⑧ 解析新 plugin.json，校验 apiVersion 兼容性
-⑨ 扫描新 JAR 的 @Extension，注册到 ExtensionRegistry
-   └─ 对每个扩展实例调用 ExtensionRegistrar.afterExtensionCreated()
-⑩ 实例化新 mainClass，调用 onInit()  → LOADED
-⑪ 更新所有依赖该插件的其他插件的 ClassLoader 引用
-⑫ 释放 ExtensionRegistry 写锁
-⑬ 调用 plugin.onStart()            → ACTIVE
+① 锁外：解析新 JAR 的 plugin.json，校验插件 ID 一致、apiVersion major 兼容
+② 获取 managementLock
+③ 校验插件存在；排除旧描述符后重做 packagePrefixes 冲突校验
+④ checkNoDependents()：被其他插件依赖则直接拒绝
+⑤ 旧插件若为 ACTIVE，先 onStop() → STOPPED
+⑥ 获取 ExtensionRegistry 写锁，在同一个锁窗口内：
+   a. 注销旧插件的全部扩展（触发 afterExtensionDestroyed）
+   b. 从 plugins 映射移除旧条目，状态机重置为 CREATED → RESOLVED
+   c. 用新 JAR 创建 PluginClassLoader，实例化主类并调用 onInit()
+   d. 扫描新 JAR 的 @Extension 并注册（触发 afterExtensionCreated）
+   e. 新条目加入 plugins，状态 → LOADED
+⑦ 释放写锁
+⑧ 锁外清理旧实例：onDestroy → 中断 ThreadGroup → 取消订阅 → 关闭旧 ClassLoader
+⑨ 发布 PluginUnloadedEvent(旧) → PluginLoadedEvent(新)
+⑩ 调用新实例 onStart() → ACTIVE，发布 PluginStartedEvent
+⑪ 重建拓扑顺序；确认最终状态为 ACTIVE 后发布 PluginReloadedEvent
 ```
 
-**并发安全**：步骤 ①–⑫ 持有写锁，`getExtensions()` 持有读锁。`ReadWriteLock` 保证读不阻塞，写操作原子完成，不存在"
-扩展数量为零"的中间窗口。
+**并发安全**：步骤 ⑥ 的“卸旧 + 注新”在同一个 `ExtensionRegistry` 写锁窗口内完成，`getExtensions()` 持有读锁，
+不存在“扩展数量为零”的中间窗口。`ReentrantReadWriteLock` 允许持有写锁的线程再次获取读锁，因此 `onInit()` 中调用
+`getExtensions()` 不会死锁。
 
-**失败处理**：如果步骤 ⑦–⑬ 任意一步失败，框架会把插件置为 `FAILED` 并发布 `PluginFailedEvent`
-。旧版本的扩展已经被注销了，宿主可以捕获事件后决定是否回退到旧 JAR。
+**失败处理**：如果步骤 ⑥ 任一环节失败，框架会清理新实例，并用旧 JAR 自动回滚（`rollbackReload` 会重新获取写锁完成
+“注册旧扩展 + 恢复状态”）；回滚也失败时插件置为 `FAILED` 并发布 `PluginFailedEvent`。如果新版本成功加载但 `onStart()`
+失败，插件进入 `FAILED`，不会再次自动回滚。
 
 **限制**：如果被其他插件依赖，`reloadPlugin()` 会直接抛 `PluginLoadException`。需要先卸载依赖方，或者避免给需要频繁热重载的插件建立依赖关系。
 
@@ -666,29 +755,20 @@ DefaultPluginManager manager = new DefaultPluginManager(new PluginEventBus(execu
 
 Java 17 废弃了 `SecurityManager`，Java 21 正式移除了。所以 Sunsen 不依赖 `SecurityManager`，而是采用 **网关拦截模式**。
 
-### 怎么拦截
+### 框架内置的拦截点
 
-插件访问所有框架能力（文件、配置、扩展、事件发布）的唯一通道是 `PluginContext`。宿主可以继承 `DefaultPluginContext`，在每个方法入口检查
-`permissions`：
+插件访问所有框架能力（文件、配置、扩展、事件发布）的唯一通道是 `PluginContext`。当前实现内置了以下约束：
 
-```java
-public class SecurePluginContext extends DefaultPluginContext {
+| 能力         | 机制                                                                                                             |
+|--------------|------------------------------------------------------------------------------------------------------------------|
+| 宿主管理操作 | `context.getPluginManager()` 返回受限视图 `PluginManagerView`：启停、安装、卸载、`setExtensionRegistrar` 等操作抛 `PluginPermissionException`（内部标识 `plugin:manage`） |
+| 事件来源     | `DefaultPluginContext.publishEvent()` 校验事件的 `sourcePluginId` 必须等于当前插件 ID                            |
+| 文件访问     | `PluginFileSystem` 把读写限制在 `pluginsDir/<pluginId>/` 内；对已存在路径使用 `toRealPath` 防符号链接逃逸        |
+| 插件自检     | `AbstractPlugin.requirePermission("file:read")` / `hasPermission(...)` 基于 `plugin.json` 的 `permissions` 断言 |
 
-    @Override
-    public Path getPluginWorkDir() {
-        requirePermission("file:read");
-        return super.getPluginWorkDir();
-    }
-
-    private void requirePermission(String permission) {
-        if (!getDescriptor().getPermissions().contains(permission)) {
-            throw new PluginPermissionException(
-                    getDescriptor().getId() + " 未声明所需权限: " + permission
-            );
-        }
-    }
-}
-```
+**注意**：框架默认**不会**自动强制校验 `permissions` 字段，权限字符串本身没有硬编码语义。`DefaultPluginManager` 直接构造
+`DefaultPluginContext`，当前未提供上下文工厂；如果需要在网关层统一拦截，需要扩展框架实现（例如引入 `PluginContextFactory`），
+或在宿主自己的扩展调用层做校验。
 
 ### 权限粒度（参考）
 
@@ -715,10 +795,10 @@ public class SecurePluginContext extends DefaultPluginContext {
    a. 校验所有非 optional 依赖的存在性和版本约束
    b. DFS 检测循环依赖
    c. Kahn 算法拓扑排序，确定加载顺序
-④ 按拓扑顺序，对每个插件：
-   a. 创建 PluginClassLoader，状态 → RESOLVED
-   b. 加载 mainClass，实例化插件对象
-   c. 调用 plugin.onInit(pluginContext)
+④ 按依赖层级分波次加载（同波次插件互不依赖，用虚拟线程并行）：
+   a. 校验 apiVersion major 兼容；创建 PluginClassLoader，状态 → RESOLVED
+   b. 加载 mainClass，实例化插件对象（TCCL 设为插件 ClassLoader）
+   c. 调用 plugin.onInit(pluginContext)，受 lifecycleTimeoutMs 超时保护
    d. 扫描 JAR 中所有 @Extension 类，注册到 ExtensionRegistry
       └─ 调用 ExtensionRegistrar.afterExtensionCreated()
    e. 状态 → LOADED；发布 PluginLoadedEvent
@@ -790,11 +870,9 @@ public class SunsenConfig {
 
 ```java
 PluginManager manager = new DefaultPluginManager();
-manager.
-
-setExtensionRegistrar(new ExtensionRegistrar() {
+manager.setExtensionRegistrar(new ExtensionRegistrar() {
     @Override
-    public void afterExtensionCreated (Object instance, Class < ? > epType){
+    public void afterExtensionCreated(Object instance, Class<?> epType) {
         if (instance instanceof ViewProvider vp) {
             Platform.runLater(() ->
                     tabPane.getTabs().add(new Tab(vp.getTitle(), vp.createView()))
@@ -803,40 +881,28 @@ setExtensionRegistrar(new ExtensionRegistrar() {
     }
 
     @Override
-    public void afterExtensionDestroyed (Object instance, Class < ? > epType){
+    public void afterExtensionDestroyed(Object instance, Class<?> epType) {
         if (instance instanceof ViewProvider vp) {
             Platform.runLater(() ->
-                    tabPane.getTabs().removeIf(t -> t.getContent() == vp.createView())
+                    tabPane.getTabs().removeIf(t -> t.getText().equals(vp.getTitle()))
             );
         }
     }
 });
 
-        manager.
-
-loadPlugins();
-manager.
-
-startPlugins();
+manager.loadPlugins();
+manager.startPlugins();
 
 // 监听插件失败事件，在 UI 上展示告警
-manager.
-
-subscribe(PluginFailedEvent .class, event ->
-        Platform.
-
-runLater(() ->
-
-showAlert("插件异常",event.getSourcePluginId() +" 启动失败:"+event.
-
-getCause().
-
-getMessage())
+manager.subscribe(PluginFailedEvent.class, event ->
+        Platform.runLater(() ->
+                showAlert("插件异常", event.getSourcePluginId() + " 启动失败:"
+                        + event.getCause().getMessage())
         )
-        );
+);
 ```
 
-`ViewProvider` 是定义在 `sunsen-core` 中的扩展点接口，框架完全不感知 JavaFX 的存在。
+`ViewProvider` 是宿主在自己的 `{app}-api` 契约模块中定义的扩展点接口，框架完全不感知 JavaFX 的存在。
 
 ---
 
@@ -854,6 +920,10 @@ getMessage())
 | `PluginDescriptor` 用 record                 | 不可变，天然线程安全，省掉一堆样板代码                                      |
 | CAS 状态机                                   | 状态转换并发安全，不会出现竞态条件                                          |
 | 扩展点接口放独立 `{app}-api` 模块            | 插件只依赖契约接口，不依赖宿主业务代码，实现真正解耦；`demo-api` 示范此模式 |
+| 分波并行加载                                  | 同波次插件无相互依赖，用虚拟线程并行缩短批量加载时间；启停仍按整体拓扑顺序 |
+| 生命周期超时                                  | 防止 `onInit/onStart/onStop/onDestroy` 挂起拖垮宿主；`STARTING` 卸载有独立排空窗口 |
+| `sole` 落选递补                               | 胜者卸载后由优先级次高的实现自动接管，避免全局唯一扩展点出现空窗           |
+| `PluginManagerView` 受限视图                  | 插件拿到的 `PluginManager` 只能查询，不能启停/安装/卸载其他插件             |
 
 ---
 

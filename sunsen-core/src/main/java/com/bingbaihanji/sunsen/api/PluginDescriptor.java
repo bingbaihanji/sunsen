@@ -18,6 +18,8 @@ import java.util.Set;
  * @param dependencies    插件依赖列表
  * @param permissions     插件权限集合
  * @param vendorInfo      插件供应商信息
+ * @param mappings        插件扁平默认参数,不可变
+ * @param metadataJson    结构化元数据紧凑 JSON 文本(规范化后),空串表示无
  * @author 冰白寒祭
  * @date 2025
  */
@@ -31,8 +33,28 @@ public record PluginDescriptor(
         List<String> packagePrefixes,
         List<DependencyDescriptor> dependencies,
         Set<String> permissions,
-        Map<String, String> vendorInfo
+        Map<String, String> vendorInfo,
+        Map<String, String> mappings,
+        String metadataJson
 ) {
+
+    /**
+     * 兼容旧调用方的 10 参构造器.
+     * 使用空 mappings (Map.of()) 和空 metadataJson ("").
+     */
+    public PluginDescriptor(String id,
+                            String name,
+                            String description,
+                            String version,
+                            String apiVersion,
+                            String mainClass,
+                            List<String> packagePrefixes,
+                            List<DependencyDescriptor> dependencies,
+                            Set<String> permissions,
+                            Map<String, String> vendorInfo) {
+        this(id, name, description, version, apiVersion, mainClass,
+                packagePrefixes, dependencies, permissions, vendorInfo, Map.of(), "");
+    }
 
     /**
      * 构造插件描述符,所有集合参数会被复制为不可变集合
@@ -47,6 +69,8 @@ public record PluginDescriptor(
      * @param dependencies    插件依赖列表
      * @param permissions     插件权限集合
      * @param vendorInfo      插件供应商信息
+     * @param mappings        插件扁平默认参数
+     * @param metadataJson    结构化元数据紧凑 JSON 文本(规范化后),空串表示无
      */
     public PluginDescriptor(String id,
                             String name,
@@ -57,7 +81,9 @@ public record PluginDescriptor(
                             List<String> packagePrefixes,
                             List<DependencyDescriptor> dependencies,
                             Set<String> permissions,
-                            Map<String, String> vendorInfo) {
+                            Map<String, String> vendorInfo,
+                            Map<String, String> mappings,
+                            String metadataJson) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.name = Objects.requireNonNull(name, "name must not be null");
         this.description = description;
@@ -68,6 +94,8 @@ public record PluginDescriptor(
         this.dependencies = List.copyOf(Objects.requireNonNull(dependencies, "dependencies must not be null"));
         this.permissions = Set.copyOf(Objects.requireNonNull(permissions, "permissions must not be null"));
         this.vendorInfo = Map.copyOf(Objects.requireNonNull(vendorInfo, "vendorInfo must not be null"));
+        this.mappings = Map.copyOf(Objects.requireNonNull(mappings, "mappings must not be null"));
+        this.metadataJson = Objects.requireNonNull(metadataJson, "metadataJson must not be null");
     }
 
     @Override

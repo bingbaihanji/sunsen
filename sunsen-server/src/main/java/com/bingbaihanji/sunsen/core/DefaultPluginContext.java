@@ -84,12 +84,18 @@ public class DefaultPluginContext implements PluginContext {
 
     @Override
     public String getProperty(String key) {
-        return configProperties.getProperty(key);
+        String value = configProperties.getProperty(key);
+        return value != null ? value : descriptor.mappings().get(key);
     }
 
     @Override
     public String getProperty(String key, String defaultValue) {
-        return configProperties.getProperty(key, defaultValue);
+        String value = configProperties.getProperty(key);
+        if (value != null) {
+            return value;
+        }
+        String mapping = descriptor.mappings().get(key);
+        return mapping != null ? mapping : defaultValue;
     }
 
     @Override

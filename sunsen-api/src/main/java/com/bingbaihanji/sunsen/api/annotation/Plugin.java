@@ -78,6 +78,15 @@ public @interface Plugin {
     Dependency[] dependencies() default {};
 
     /**
+     * 插件扁平默认参数,生成到 {@code plugin.json} 的 {@code mappings} 对象.
+     * <p>
+     * {@code key} 不能为空或空白,同一 {@code @Plugin} 内不能重复,重复时由注解处理器在编译期报错;
+     * {@code value} 只支持字符串,允许空字符串. 运行期按
+     * {@code config.properties > mappings > 方法默认值} 的优先级读取.
+     */
+    KeyValue[] mappings() default {};
+
+    /**
      * 运行时权限声明,由宿主在 {@code PluginContext} 中拦截
      */
     String[] permissions() default {};
@@ -108,6 +117,24 @@ public @interface Plugin {
          * 是否为可选依赖
          */
         boolean optional() default false;
+    }
+
+    /**
+     * 扁平键值对
+     */
+    @Documented
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({})
+    @interface KeyValue {
+        /**
+         * 配置键,不能为空或空白
+         */
+        String key();
+
+        /**
+         * 配置值,只支持字符串,允许空字符串
+         */
+        String value();
     }
 
     /**

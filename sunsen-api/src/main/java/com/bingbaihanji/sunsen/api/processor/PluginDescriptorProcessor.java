@@ -12,6 +12,7 @@ import javax.tools.FileObject;
 import javax.tools.StandardLocation;
 import java.io.IOException;
 import java.io.Writer;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
@@ -48,7 +49,7 @@ public class PluginDescriptorProcessor extends AbstractProcessor {
      *   <li>校验注解中必填字段（{@code id}、{@code name}、{@code version}、{@code packagePrefixes}）的合法性和非空性;</li>
      *   <li>推断插件主类（优先使用 {@code mainClass()},否则取注解所在类全限定名）;</li>
      *   <li>确定 API 版本（优先使用 {@code apiVersion()},否则取 {@link SunsenVersion#API_VERSION}）;</li>
-     *   <li>构建 JSON 描述对象,包含插件标识、版本、包隔离前缀、依赖、权限、厂商等信息;</li>
+     *   <li>构建 JSON 描述对象,包含插件标识、版本、包隔离前缀、mappings、依赖、权限、厂商等信息;</li>
      *   <li>将 JSON 内容写入编译输出目录下的 {@code META-INF/plugin.json}。</li>
      * </ol>
      *
@@ -110,6 +111,24 @@ public class PluginDescriptorProcessor extends AbstractProcessor {
                 continue;
             }
 
+            Set<String> mappingKeys = new HashSet<>();
+            boolean mappingsValid = true;
+            for (Plugin.KeyValue mapping : plugin.mappings()) {
+                if (mapping.key() == null || mapping.key().isBlank()) {
+                    error(typeElement, "@Plugin.mappings 包含空 key");
+                    mappingsValid = false;
+                    break;
+                }
+                if (!mappingKeys.add(mapping.key())) {
+                    error(typeElement, "@Plugin.mappings 包含重复 key: '" + mapping.key() + "'");
+                    mappingsValid = false;
+                    break;
+                }
+            }
+            if (!mappingsValid) {
+                continue;
+            }
+
             // 推断 mainClass
             String mainClass = plugin.mainClass();
             if (mainClass == null || mainClass.isBlank()) {
@@ -145,6 +164,22 @@ public class PluginDescriptorProcessor extends AbstractProcessor {
                 sb.append("\n");
             }
             sb.append("  ]");
+
+            // mappings
+            Plugin.KeyValue[] mappings = plugin.mappings();
+            if (mappings.length > 0) {
+                sb.append(",\n");
+                sb.append("  \"mappings\": {\n");
+                for (int i = 0; i < mappings.length; i++) {
+                    sb.append("    \"").append(escapeJson(mappings[i].key()))
+                            .append("\": \"").append(escapeJson(mappings[i].value())).append("\"");
+                    if (i < mappings.length - 1) {
+                        sb.append(",");
+                    }
+                    sb.append("\n");
+                }
+                sb.append("  }");
+            }
 
             // dependencies
             Plugin.Dependency[] dependencies = plugin.dependencies();
@@ -258,7 +293,13 @@ public class PluginDescriptorProcessor extends AbstractProcessor {
                 case '\n' -> sb.append("\\n");
                 case '\r' -> sb.append("\\r");
                 case '\t' -> sb.append("\\t");
-                default -> sb.append(c);
+                default -> {
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+                }
             }
         }
         return sb.toString();

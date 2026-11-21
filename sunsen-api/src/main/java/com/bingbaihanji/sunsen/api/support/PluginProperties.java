@@ -54,7 +54,7 @@ public final class PluginProperties {
     }
 
     /**
-     * 读取字符串配置,不存在或空白时返回 {@code defaultValue}.
+     * 读取字符串配置,不存在时返回 {@code defaultValue};空字符串视为已配置,原样返回.
      */
     public String getString(String key, String defaultValue) {
         return context.getProperty(key, defaultValue);

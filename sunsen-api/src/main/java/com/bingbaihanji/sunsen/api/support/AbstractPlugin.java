@@ -164,14 +164,16 @@ public abstract class AbstractPlugin implements Plugin {
     // ---- 配置 ----
 
     /**
-     * 读取插件配置(来源:工作目录下的 {@code config.properties}),不存在返回 {@code null}.
+     * 读取插件配置.查找顺序:{@code config.properties} &gt; {@link PluginDescriptor#mappings()},
+     * 都不存在返回 {@code null}.空字符串视为已配置,原样返回.
      */
     protected final String property(String key) {
         return context.getProperty(key);
     }
 
     /**
-     * 读取插件配置,不存在时返回 {@code defaultValue}.
+     * 读取插件配置.查找顺序:{@code config.properties} &gt; {@link PluginDescriptor#mappings()}
+     * &gt; {@code defaultValue}.空字符串视为已配置,原样返回.
      */
     protected final String property(String key, String defaultValue) {
         return context.getProperty(key, defaultValue);
