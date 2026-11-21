@@ -182,7 +182,7 @@ public abstract class AbstractPlugin implements Plugin {
     /**
      * 重新从工作目录的 {@code config.properties} 加载配置.
      * <p>
-     * 调用后，{@link #property(String)} 等方法将读取到最新值.
+     * 调用后,{@link #property(String)} 等方法将读取到最新值.
      */
     protected final void reloadConfig() {
         context.reloadConfig();
@@ -210,7 +210,7 @@ public abstract class AbstractPlugin implements Plugin {
     /**
      * 获取指定扩展点的元数据列表,不持有扩展实例引用.
      * <p>
-     * 适合只需要查看已注册扩展的 id、order、description 等元数据而无需调用扩展的场景.
+     * 适合只需要查看已注册扩展的 id,order,description 等元数据而无需调用扩展的场景.
      */
     protected final <T> List<ExtensionInfo> extensionInfos(Class<T> extensionPoint) {
         return context.getExtensionInfos(extensionPoint);

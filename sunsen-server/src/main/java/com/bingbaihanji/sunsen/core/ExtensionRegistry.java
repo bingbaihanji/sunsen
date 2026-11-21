@@ -128,7 +128,7 @@ public class ExtensionRegistry {
             String key = extensionPointType.getName();
             List<ExtensionEntry<?>> list = entries.computeIfAbsent(key, k -> new ArrayList<>());
 
-            // sole 扩展点：全局只能有一个插件实现(含同插件内),冲突时保留 order 最小(优先级最高)的
+            // sole 扩展点:全局只能有一个插件实现(含同插件内),冲突时保留 order 最小(优先级最高)的
             if (isSole && !list.isEmpty()) {
                 ExtensionEntry<?> existing = list.get(0);
                 // 同插件内重复实现 sole 扩展点:直接拒绝,不参与竞争
@@ -155,7 +155,7 @@ public class ExtensionRegistry {
                             pendingDestroyInstance = existing.getInstance();
                             pendingDestroyType = extensionPointType;
                         }
-                        // 将被逐出的旧条目存入候选列表（按 order 升序）
+                        // 将被逐出的旧条目存入候选列表(按 order 升序)
                         insertSortedByOrder(rejectedSoleCandidates.computeIfAbsent(key, k -> new ArrayList<>()), existing);
                         list.clear();
                     } else {
@@ -169,7 +169,7 @@ public class ExtensionRegistry {
                             pendingDestroyInstance = entry.getInstance();
                             pendingDestroyType = extensionPointType;
                         }
-                        // 将被拒绝的新条目存入候选列表（按 order 升序）
+                        // 将被拒绝的新条目存入候选列表(按 order 升序)
                         insertSortedByOrder(rejectedSoleCandidates.computeIfAbsent(key, k -> new ArrayList<>()), entry);
                         registered = false;
                     }
@@ -286,8 +286,8 @@ public class ExtensionRegistry {
     /**
      * 注销指定插件的所有扩展.
      * <p>
-     * 所有注册表变更在写锁内完成；{@link ExtensionRegistrar} 回调在锁释放后统一触发，
-     * 避免外部代码持有写锁期间再次调用 {@code getExtensions}（读锁）造成长时间阻塞或死锁。
+     * 所有注册表变更在写锁内完成;{@link ExtensionRegistrar} 回调在锁释放后统一触发,
+     * 避免外部代码持有写锁期间再次调用 {@code getExtensions}(读锁)造成长时间阻塞或死锁.
      */
     public void unregisterPlugin(String pluginId) {
         // Callbacks to invoke after the lock is released
@@ -321,7 +321,7 @@ public class ExtensionRegistry {
             rejectedSoleCandidates.values().forEach(list -> list.removeIf(e -> e.pluginId().equals(pluginId)));
             rejectedSoleCandidates.entrySet().removeIf(e -> e.getValue().isEmpty());
 
-            // sole 幸存者恢复：对于因删除而变空的扩展点，若有候选则自动接管
+            // sole 幸存者恢复:对于因删除而变空的扩展点,若有候选则自动接管
             for (String key : emptyKeys) {
                 List<ExtensionEntry<?>> candidates = rejectedSoleCandidates.get(key);
                 if (candidates != null && !candidates.isEmpty()) {

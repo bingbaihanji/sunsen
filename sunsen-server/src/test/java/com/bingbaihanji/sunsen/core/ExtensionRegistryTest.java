@@ -106,7 +106,7 @@ class ExtensionRegistryTest {
 
     @Test
     void testSoleLowerOrderWins() {
-        // BackendA order=10 注册在前，BackendB order=20 注册在后 → A 胜
+        // BackendA order=10 注册在前,BackendB order=20 注册在后 → A 胜
         registry.register(descriptor("plugin-a"), BackendA.class, Backend.class);
         registry.register(descriptor("plugin-b"), BackendB.class, Backend.class);
 
@@ -119,7 +119,7 @@ class ExtensionRegistryTest {
 
     @Test
     void testSoleHigherPriorityWinsWhenRegisteredSecond() {
-        // BackendB order=20 注册在前，BackendA order=10 注册在后 → A 仍胜
+        // BackendB order=20 注册在前,BackendA order=10 注册在后 → A 仍胜
         registry.register(descriptor("plugin-b"), BackendB.class, Backend.class);
         registry.register(descriptor("plugin-a"), BackendA.class, Backend.class);
 
@@ -133,7 +133,7 @@ class ExtensionRegistryTest {
         registry.register(descriptor("plugin-a"), BackendA.class, Backend.class); // 胜 order=10
         registry.register(descriptor("plugin-b"), BackendB.class, Backend.class); // 败 order=20
 
-        // 卸载胜者后，BackendB 应自动恢复
+        // 卸载胜者后,BackendB 应自动恢复
         registry.unregisterPlugin("plugin-a");
 
         List<Backend> backends = registry.getExtensions(Backend.class);
@@ -146,8 +146,8 @@ class ExtensionRegistryTest {
         registry.register(descriptor("plugin-a"), BackendA.class, Backend.class);
         registry.register(descriptor("plugin-b"), BackendB.class, Backend.class);
 
-        registry.unregisterPlugin("plugin-b"); // 先卸载败者（从候选列表移除）
-        registry.unregisterPlugin("plugin-a"); // 再卸载胜者，无候选可恢复
+        registry.unregisterPlugin("plugin-b"); // 先卸载败者(从候选列表移除)
+        registry.unregisterPlugin("plugin-a"); // 再卸载胜者,无候选可恢复
 
         assertTrue(registry.getExtensions(Backend.class).isEmpty());
     }

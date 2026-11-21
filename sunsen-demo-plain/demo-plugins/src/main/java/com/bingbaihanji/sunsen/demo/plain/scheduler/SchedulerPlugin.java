@@ -13,17 +13,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Scheduler 演示插件
  * <p>
- * 高级用法演示：
+ * 高级用法演示:
  * <ul>
- *   <li>{@link ManagedScheduler} 后台定时任务，线程命名 {@code plugin-scheduler-<pluginId>}</li>
- *   <li>{@code manage(scheduler)} 注册到 LIFO 资源链，{@code onDestroy} 自动 close</li>
- *   <li>{@code onStop} 中显式 {@code shutdown}：插件 STOPPED 状态期间停止任务，UNLOADED 时
- *       {@code close()}（幂等）再次清理</li>
+ *   <li>{@link ManagedScheduler} 后台定时任务,线程命名 {@code plugin-scheduler-<pluginId>}</li>
+ *   <li>{@code manage(scheduler)} 注册到 LIFO 资源链,{@code onDestroy} 自动 close</li>
+ *   <li>{@code onStop} 中显式 {@code shutdown}:插件 STOPPED 状态期间停止任务,UNLOADED 时
+ *       {@code close()}(幂等)再次清理</li>
  *   <li>定期 {@code publish(GreetingEvent)} 触发 HelloPlugin 的订阅者</li>
- *   <li>贡献单一 {@link GreetingFormatter} 实现（{@code allowMultiple=false}）</li>
+ *   <li>贡献单一 {@link GreetingFormatter} 实现({@code allowMultiple=false})</li>
  * </ul>
  * <p>
- * 本插件只依赖 demo-api（{@link GreetingFormatter}、{@link GreetingEvent}），不依赖 demo-host。
+ * 本插件只依赖 demo-api({@link GreetingFormatter},{@link GreetingEvent}),不依赖 demo-host.
  */
 @Plugin(
         id = "com.bingbaihanji.sunsen.demo.plain.scheduler",
@@ -45,7 +45,7 @@ public class SchedulerPlugin extends AbstractPlugin {
 
     @Override
     public void onStart() {
-        // manage() 把调度器注册到 onDestroy 的清理列表，并直接返回 scheduler 用于赋值
+        // manage() 把调度器注册到 onDestroy 的清理列表,并直接返回 scheduler 用于赋值
         scheduler = manage(ManagedScheduler.create(pluginId()));
         scheduler.scheduleWithFixedDelay(this::tick, 500, 1000, TimeUnit.MILLISECONDS);
         System.out.println("[SchedulerPlugin] onStart | 已启动定时器 (1s)");
@@ -59,8 +59,8 @@ public class SchedulerPlugin extends AbstractPlugin {
 
     @Override
     public void onStop() {
-        // 优雅停止：onStop 阶段不再发布事件，避免在停止过程中干扰其他插件
-        // close() 在 onDestroy 时会再次调用，shutdown 是幂等的
+        // 优雅停止:onStop 阶段不再发布事件,避免在停止过程中干扰其他插件
+        // close() 在 onDestroy 时会再次调用,shutdown 是幂等的
         if (scheduler != null) {
             scheduler.shutdown();
         }

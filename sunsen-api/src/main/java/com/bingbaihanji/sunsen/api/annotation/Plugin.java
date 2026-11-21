@@ -109,7 +109,7 @@ public @interface Plugin {
         String id();
 
         /**
-         * 依赖版本约束表达式,如 {@code ">=1.0.0"}、{@code "^1.2.0"}
+         * 依赖版本约束表达式,如 {@code ">=1.0.0"},{@code "^1.2.0"}
          */
         String version();
 

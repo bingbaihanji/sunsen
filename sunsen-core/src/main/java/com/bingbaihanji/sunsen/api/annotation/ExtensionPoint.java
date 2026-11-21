@@ -34,7 +34,7 @@ public @interface ExtensionPoint {
      * true 时如果多个插件提供了实现,框架打印警告并只保留 {@code @Extension(order)} 最小(优先级最高)的一个.
      * 与 {@link #allowMultiple()} 正交: allowMultiple 控制单个插件内的实现数量, sole 控制跨插件的全局唯一性.
      * <p>
-     * 适用场景: 数据库驱动、认证后端等<strong>低频变更</strong>的基础设施选择.
+     * 适用场景: 数据库驱动,认证后端等<strong>低频变更</strong>的基础设施选择.
      * 被舍弃的实现保存在候选列表中;若当前优胜者所在插件卸载,优先级次高的候选会自动接管.
      */
     boolean sole() default false;

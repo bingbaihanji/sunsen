@@ -12,15 +12,15 @@ import java.util.List;
 /**
  * Hello 演示插件
  * <p>
- * 高级用法演示：
+ * 高级用法演示:
  * <ul>
  *   <li>继承 {@link AbstractPlugin} 而非直接实现 {@code Plugin}</li>
  *   <li>用 {@link PluginProperties} 类型安全地读取 {@code config.properties}</li>
  *   <li>{@code onInitialized()} 中通过 {@code requirePermission} 提前发现权限缺失</li>
- *   <li>{@code onStart()} 中订阅 {@link GreetingEvent}，框架在 UNLOADED 时自动取消订阅</li>
+ *   <li>{@code onStart()} 中订阅 {@link GreetingEvent},框架在 UNLOADED 时自动取消订阅</li>
  * </ul>
  * <p>
- * 本插件只依赖 demo-api（{@link Greeter}、{@link GreetingEvent}），不依赖 demo-host。
+ * 本插件只依赖 demo-api({@link Greeter},{@link GreetingEvent}),不依赖 demo-host.
  */
 @Plugin(
         id = "com.bingbaihanji.sunsen.demo.plain.hello",
@@ -32,7 +32,7 @@ import java.util.List;
 public class HelloPlugin extends AbstractPlugin {
 
     /**
-     * 问候语后缀，从 config.properties 读取。
+     * 问候语后缀,从 config.properties 读取.
      */
     static volatile String greetingSuffix = "";
 
@@ -49,7 +49,7 @@ public class HelloPlugin extends AbstractPlugin {
 
     @Override
     public void onStart() {
-        // 订阅其他插件发布的 GreetingEvent；UNLOADED 时框架自动清理
+        // 订阅其他插件发布的 GreetingEvent;UNLOADED 时框架自动清理
         subscribe(GreetingEvent.class, event -> System.out.println(
                 "[HelloPlugin] 收到来自 " + event.getSourcePluginId()
                         + " 的问候: " + event.getMessage()));
@@ -62,7 +62,7 @@ public class HelloPlugin extends AbstractPlugin {
     }
 
     /**
-     * 配置使用枚举的小示例。
+     * 配置使用枚举的小示例.
      *
      * @author 冰白寒祭
      * @date 2025

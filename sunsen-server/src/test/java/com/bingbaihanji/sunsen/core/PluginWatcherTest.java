@@ -110,8 +110,8 @@ class PluginWatcherTest {
         assertEquals(PluginState.ACTIVE, manager.getPluginState("com.bingbaihanji.sunsen.core.test.hello"),
                 "watcher 应自动加载并启动插件");
 
-        // Windows 上已加载的 JAR 会被 ClassLoader 占用，无法直接删除。
-        // 先手动 stop/unload 释放文件句柄，再删除 JAR，验证 watcher 后续不会重新加载。
+        // Windows 上已加载的 JAR 会被 ClassLoader 占用,无法直接删除.
+        // 先手动 stop/unload 释放文件句柄,再删除 JAR,验证 watcher 后续不会重新加载.
         manager.stopPlugin("com.bingbaihanji.sunsen.core.test.hello");
         manager.unloadPlugin("com.bingbaihanji.sunsen.core.test.hello");
 

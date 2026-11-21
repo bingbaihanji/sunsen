@@ -18,20 +18,20 @@ import java.util.Optional;
 /**
  * Sunsen 纯 Java 宿主演示程序
  * <p>
- * 演示进阶用法：
+ * 演示进阶用法:
  * <ul>
- *   <li>{@link ExtensionRegistrar} 钩子，把扩展生命周期同步到宿主侧</li>
- *   <li>父类型事件订阅：监听 {@code PluginEvent.class} 收到所有生命周期与业务事件</li>
+ *   <li>{@link ExtensionRegistrar} 钩子,把扩展生命周期同步到宿主侧</li>
+ *   <li>父类型事件订阅:监听 {@code PluginEvent.class} 收到所有生命周期与业务事件</li>
  *   <li>{@code allowMultiple = false} 的 {@link GreetingFormatter} 单例扩展点</li>
- *   <li>插件自定义事件 {@link GreetingEvent}：scheduler 发布、hello 订阅、宿主旁观</li>
- *   <li>{@code ManagedScheduler} 后台定时器：等待 3 秒观察周期性 tick</li>
+ *   <li>插件自定义事件 {@link GreetingEvent}:scheduler 发布,hello 订阅,宿主旁观</li>
+ *   <li>{@code ManagedScheduler} 后台定时器:等待 3 秒观察周期性 tick</li>
  * </ul>
  * <p>
- * 模块依赖关系（宿主只依赖契约接口，不依赖任何插件实现）：
+ * 模块依赖关系(宿主只依赖契约接口,不依赖任何插件实现):
  * <pre>
- *   demo-host ──→ demo-api（Greeter / GreetingFormatter / GreetingEvent）
- *   demo-host ──→ sunsen-server（框架运行时）
- *   demo-plugins ──→ demo-api（实现契约接口）
+ *   demo-host ──→ demo-api(Greeter / GreetingFormatter / GreetingEvent)
+ *   demo-host ──→ sunsen-server(框架运行时)
+ *   demo-plugins ──→ demo-api(实现契约接口)
  * </pre>
  *
  * @author 冰白寒祭
@@ -45,7 +45,7 @@ public class PlainDemoApp {
         DefaultPluginManager manager = new DefaultPluginManager();
         manager.setPluginsDir(pluginsDir);
 
-        // 1. 注册 ExtensionRegistrar：扩展实例创建/销毁时由框架回调
+        // 1. 注册 ExtensionRegistrar:扩展实例创建/销毁时由框架回调
         manager.setExtensionRegistrar(new ExtensionRegistrar() {
             @Override
             public void afterExtensionCreated(Object instance, Class<?> extensionPoint) {
@@ -60,7 +60,7 @@ public class PlainDemoApp {
             }
         });
 
-        // 2. 订阅父类型 PluginEvent：接收所有生命周期事件 + 插件发布的业务事件
+        // 2. 订阅父类型 PluginEvent:接收所有生命周期事件 + 插件发布的业务事件
         manager.subscribe(PluginEvent.class, event -> {
             String tag = switch (event) {
                 case PluginLoadedEvent e -> "LOADED";
@@ -76,7 +76,7 @@ public class PlainDemoApp {
         System.out.println("=== Sunsen Plain Demo ===");
         System.out.println("插件目录: " + pluginsDir);
 
-        // 3. 加载插件（依赖拓扑排序）
+        // 3. 加载插件(依赖拓扑排序)
         System.out.println("\n--- 1) loadPlugins() ---");
         manager.loadPlugins();
         List<PluginDescriptor> plugins = manager.getPlugins();
@@ -85,11 +85,11 @@ public class PlainDemoApp {
             System.out.println("  - " + pd.id() + " [" + pd.version() + "] perms=" + pd.permissions());
         }
 
-        // 4. 启动插件（拓扑顺序，onStart 中可访问扩展）
+        // 4. 启动插件(拓扑顺序,onStart 中可访问扩展)
         System.out.println("\n--- 2) startPlugins() ---");
         manager.startPlugins();
 
-        // 5. 调用所有 Greeter 扩展（allowMultiple = true，按 order 升序）
+        // 5. 调用所有 Greeter 扩展(allowMultiple = true,按 order 升序)
         System.out.println("\n--- 3) Greeter 扩展遍历 ---");
         List<Greeter> greeters = manager.getExtensions(Greeter.class);
         System.out.println("发现 Greeter 扩展数量: " + greeters.size());
@@ -141,7 +141,7 @@ public class PlainDemoApp {
         Path first = Path.of(candidates.get(0));
         throw new IllegalStateException(
                 "插件目录不存在: " + first.toAbsolutePath().normalize()
-                        + "。请先执行 mvn install 构建 demo-plugins 模块。");
+                        + ".请先执行 mvn install 构建 demo-plugins 模块.");
     }
 
 }

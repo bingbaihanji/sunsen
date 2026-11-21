@@ -183,8 +183,8 @@ public class DefaultPluginContext implements PluginContext {
     /**
      * 插件可见的 PluginManager 受限视图.
      * <p>
-     * 默认只开放查询、扩展访问和绑定插件身份的事件能力。插件生命周期、安装卸载和注册器配置属于宿主管理能力，
-     * 不通过默认上下文暴露给插件代码。
+     * 默认只开放查询,扩展访问和绑定插件身份的事件能力.插件生命周期,安装卸载和注册器配置属于宿主管理能力,
+     * 不通过默认上下文暴露给插件代码.
      */
     private static class PluginManagerView implements PluginManager {
         private static final String MANAGE_PERMISSION = "plugin:manage";

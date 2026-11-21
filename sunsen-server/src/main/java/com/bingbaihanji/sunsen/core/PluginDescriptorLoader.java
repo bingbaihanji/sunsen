@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
  * 并解析为 {@link PluginDescriptor}
  * <p>
  * {@code META-INF/plugin.json} 为必填描述文件;{@code META-INF/plugin-metadata.json} 为可选的结构化元数据资源,
- * 当 {@code plugin.json} 未提供 {@code metadata} 字段时作为元数据来源。
+ * 当 {@code plugin.json} 未提供 {@code metadata} 字段时作为元数据来源.
  *
  * @author 冰白寒祭
  * @date 2025
@@ -95,7 +95,7 @@ public final class PluginDescriptorLoader {
 
         String id = requireNonBlank(root.get("id").asText(), "id");
         if (!PLUGIN_ID_PATTERN.matcher(id).matches()) {
-            throw new PluginLoadException("插件 ID 包含非法字符: '" + id + "'，仅允许字母、数字、点、下划线、连字符");
+            throw new PluginLoadException("插件 ID 包含非法字符: '" + id + "',仅允许字母,数字,点,下划线,连字符");
         }
         String name = requireNonBlank(root.get("name").asText(), "name");
         String description = getText(root, "description", "");

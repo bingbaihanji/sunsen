@@ -283,7 +283,7 @@ public class DefaultPluginManager implements PluginManager {
 
         managementLock.lock();
         try {
-            // 锁内：防止并发 loadPlugins/loadPlugin 导致的 ClassLoader 泄漏
+            // 锁内:防止并发 loadPlugins/loadPlugin 导致的 ClassLoader 泄漏
             try {
                 List<PluginDescriptor> allDescriptors = new ArrayList<>(getPlugins());
                 allDescriptors.addAll(descriptors);
@@ -786,12 +786,12 @@ public class DefaultPluginManager implements PluginManager {
     }
 
     /**
-     * 创建插件实例并执行 onInit，但不扫描/注册扩展，也不加入 plugins map。
-     * 调用方需保证状态机已初始化到 CREATED。
+     * 创建插件实例并执行 onInit,但不扫描/注册扩展,也不加入 plugins map.
+     * 调用方需保证状态机已初始化到 CREATED.
      *
      * @param descriptor 插件描述符
      * @param jarPath    插件 JAR 路径
-     * @return 包含实例、ClassLoader、Context 的候选条目
+     * @return 包含实例,ClassLoader,Context 的候选条目
      */
     private PluginEntry loadPluginInstanceOnly(PluginDescriptor descriptor, Path jarPath) {
         String pluginId = descriptor.id();
@@ -871,9 +871,9 @@ public class DefaultPluginManager implements PluginManager {
     }
 
     /**
-     * 在当前线程中完成插件实例化与 onInit，不切换工作线程。
-     * 用于热重载/回滚路径：调用方已持有 registry 写锁，当前线程可直接获取读锁，
-     * 避免 spawn 新线程后因读锁不可中断导致的死锁/线程泄漏。
+     * 在当前线程中完成插件实例化与 onInit,不切换工作线程.
+     * 用于热重载/回滚路径:调用方已持有 registry 写锁,当前线程可直接获取读锁,
+     * 避免 spawn 新线程后因读锁不可中断导致的死锁/线程泄漏.
      */
     private PluginEntry loadPluginInstanceDirect(PluginDescriptor descriptor, Path jarPath) {
         String pluginId = descriptor.id();
@@ -949,16 +949,16 @@ public class DefaultPluginManager implements PluginManager {
     }
 
     /**
-     * 将已完成 onInit 的插件条目注册到注册表：扫描扩展、加入 plugins map、状态转 LOADED。
-     * 本方法不自行加注册表写锁，调用方需根据场景决定是否在外层加锁。
-     * 热重载路径会在同一把写锁内先注销旧扩展再调用本方法，以保证原子窗口。
+     * 将已完成 onInit 的插件条目注册到注册表:扫描扩展,加入 plugins map,状态转 LOADED.
+     * 本方法不自行加注册表写锁,调用方需根据场景决定是否在外层加锁.
+     * 热重载路径会在同一把写锁内先注销旧扩展再调用本方法,以保证原子窗口.
      */
     private void registerPluginInRegistry(PluginEntry entry) {
         String pluginId = entry.descriptor().id();
         extensionScanner.scan(entry.descriptor(), entry.classLoader());
         PluginEntry existing = plugins.putIfAbsent(pluginId, entry);
         if (existing != null) {
-            // 并发加载同 ID 插件，关闭冗余 ClassLoader 避免泄漏
+            // 并发加载同 ID 插件,关闭冗余 ClassLoader 避免泄漏
             try {
                 entry.classLoader().close();
             } catch (IOException ignored) {
@@ -969,7 +969,7 @@ public class DefaultPluginManager implements PluginManager {
     }
 
     /**
-     * 加载失败后的统一清理：强制 FAILED、注销扩展、取消订阅、关闭 ClassLoader。
+     * 加载失败后的统一清理:强制 FAILED,注销扩展,取消订阅,关闭 ClassLoader.
      */
     private void cleanupFailedLoad(String pluginId, DefaultPluginContext context, PluginClassLoader classLoader) {
         PluginState state = stateMachine.getState(pluginId);
@@ -1041,7 +1041,7 @@ public class DefaultPluginManager implements PluginManager {
                 if (pluginId.equals(dep.id())) {
                     throw new PluginLoadException(
                             "插件 " + pluginId + " 被插件 " + entry.descriptor().id()
-                                    + " 依赖，无法直接卸载。请先卸载依赖方。");
+                                    + " 依赖,无法直接卸载.请先卸载依赖方.");
                 }
             }
         }
@@ -1063,7 +1063,7 @@ public class DefaultPluginManager implements PluginManager {
     }
 
     /**
-     * 清理指定插件条目的实例资源，不操作 plugins map。
+     * 清理指定插件条目的实例资源,不操作 plugins map.
      */
     private void cleanupPluginInstanceEntry(PluginEntry entry) {
         String pluginId = entry.descriptor().id();
@@ -1093,7 +1093,7 @@ public class DefaultPluginManager implements PluginManager {
     }
 
     /**
-     * 热重载失败时尝试回滚到旧版本。
+     * 热重载失败时尝试回滚到旧版本.
      *
      * @return 是否成功回滚到 ACTIVE 状态
      */

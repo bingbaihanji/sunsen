@@ -169,7 +169,7 @@ public interface PluginManager extends AutoCloseable {
     /**
      * 获取指定扩展点的元数据列表,不持有扩展实例引用.
      * <p>
-     * 适用于管理界面、监控日志等只需要元数据而不调用扩展逻辑的场景.
+     * 适用于管理界面,监控日志等只需要元数据而不调用扩展逻辑的场景.
      *
      * @param extensionPoint 扩展点接口类型
      * @return 按 order 升序排列的 {@link ExtensionInfo} 列表

@@ -19,16 +19,16 @@ description: Use this skill whenever real runtime execution evidence is relevant
 ## Data Availability
 
 - If runtime data is available:
-    - It represents a complete recorded execution of the user's run
-    - Including the user actions and bug reproduction process
+  - It represents a complete recorded execution of the user's run
+  - Including the user actions and bug reproduction process
 
 - Do NOT assume:
-    - the bug did not occur
-    - the user action did not happen
-    - the recording missed relevant execution
+  - the bug did not occur
+  - the user action did not happen
+  - the recording missed relevant execution
 
 - Missing expected observations should be interpreted as:
-    - Strong Negative (if within scope)
+  - Strong Negative (if within scope)
 
 - Runtime data MUST be treated as:
   > the ground truth of actual execution
@@ -40,7 +40,6 @@ description: Use this skill whenever real runtime execution evidence is relevant
 - Out of scope / no data → **Unknown**
 
 ## Shell Notes
-
 - 所有命令使用单行，避免换行在不同终端中的兼容性问题
 - windows下面 cmd 和 powershell 需要注意转义问题
 
@@ -56,20 +55,21 @@ description: Use this skill whenever real runtime execution evidence is relevant
 
 3.1 先阅读说明书 `XCODEMAP_RUNTIMEDATA_API.md`, 调用 `checkRecordDataAndScope`，确认当前有可用录制数据与范围概况。
 
-3.2
 
-- **想知道函数有没有执行？** 对于协议入口级、模块 API 级、插件 Hook 级函数可以使用 `findFunctionCalls`。如果已经对齐了协议入口或
-  API 等，记得加上 `scopeCallIds`，缩小范围。 3.3
-- **想知道分支是否命中？** 首先考虑使用 `observeExecutionSkeleton`, 如果已经明确知道了 parent `callId`，也可以使用
-  `observeChildrenCalls`。
+3.2 
+- **想知道函数有没有执行？** 对于协议入口级、模块 API 级、插件 Hook 级函数可以使用 `findFunctionCalls`。如果已经对齐了协议入口或 API 等，记得加上 `scopeCallIds`，缩小范围。
+3.3
+- **想知道分支是否命中？** 首先考虑使用 `observeExecutionSkeleton`, 如果已经明确知道了 parent `callId`，也可以使用 `observeChildrenCalls`。
 
 ---
+
 
 # 4. Environment Notes
 
 ## 📌 curl 跨平台使用小结
 
 > ⚠️ **所有示例均为单行命令**，避免换行在不同终端中的兼容性问题
+
 
 ### ✅ 推荐优先级
 
@@ -97,13 +97,13 @@ curl -X POST "http://localhost/..." -H "Content-Type: application/json" -H "Acce
 
 * **PowerShell 里 `curl` ≠ curl**
 
-    * 实际是 `Invoke-WebRequest`
-    * ✅ 必须使用：`curl.exe`
+  * 实际是 `Invoke-WebRequest`
+  * ✅ 必须使用：`curl.exe`
 
 * **cmd 必须转义 JSON**
 
-    * ❌ 错误：`"{ "key": "value" }"`
-    * ✅ 正确：`"{\"key\":\"value\"}"`
+  * ❌ 错误：`"{ "key": "value" }"`
+  * ✅ 正确：`"{\"key\":\"value\"}"`
 
 * **不要省略 Content-Type**
 
@@ -116,18 +116,15 @@ curl -X POST "http://localhost/..." -H "Content-Type: application/json" -H "Acce
 # 5. Error notes
 
 - `No active process`：当前没有激活录制进程，先激活/选择进程再调用接口。
-- `404`：通常是路径拼接错误。注意 Base URL 必须包含 `7a14c3b3`：
-  `http://localhost:63342/xcodemap-trace-server/7a14c3b3/runtimedata/<api>`。
+- `404`：通常是路径拼接错误。注意 Base URL 必须包含 `7a14c3b3`：`http://localhost:63342/xcodemap-trace-server/7a14c3b3/runtimedata/<api>`。
 - 其他 `4xx/5xx`：查看 `errorMsg` 获取参数缺失、解析失败等原因。
-- Windows（CMD/PowerShell）下 **尤其要注意请求参数引号规范**：JSON 中的双引号需要正确转义（如 CMD 常用 `\"`
-  ）；建议先用最小请求体验证，再逐步加参数，避免因引号错误触发参数解析失败。
+- Windows（CMD/PowerShell）下**尤其要注意请求参数引号规范**：JSON 中的双引号需要正确转义（如 CMD 常用 `\"`）；建议先用最小请求体验证，再逐步加参数，避免因引号错误触发参数解析失败。
 
 ---
 
 # 6. Output format
 
 Must include:
-
 - Observation Points
 - Observations with evidence strength
 - Summary (facts only)

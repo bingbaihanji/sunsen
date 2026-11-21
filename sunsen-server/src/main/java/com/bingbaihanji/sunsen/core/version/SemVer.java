@@ -9,7 +9,7 @@ package com.bingbaihanji.sunsen.core.version;
  * @param major      主版本号
  * @param minor      次版本号
  * @param patch      修订版本号
- * @param preRelease 预发布标识符(如 "beta"、"alpha.1"),无预发布段时为 null
+ * @param preRelease 预发布标识符(如 "beta","alpha.1"),无预发布段时为 null
  * @param build      构建元数据,比较时忽略
  * @author 冰白寒祭
  * @date 2025
@@ -32,7 +32,7 @@ public record SemVer(
     /**
      * 解析语义化版本字符串
      *
-     * @param version 版本字符串,如 "1.2.3"、"v1.0.0-beta.1"、"1.2.3+build123"
+     * @param version 版本字符串,如 "1.2.3","v1.0.0-beta.1","1.2.3+build123"
      * @return 解析后的 SemVer 对象
      * @throws IllegalArgumentException 版本格式不合法
      */
@@ -85,7 +85,7 @@ public record SemVer(
     }
 
     /**
-     * 按主、次、修订版本号依次比较,预发布版低于正式版.
+     * 按主,次,修订版本号依次比较,预发布版低于正式版.
      *
      * @param other 另一个 SemVer 对象
      * @return 负数表示小于,0 表示等于,正数表示大于

@@ -120,14 +120,14 @@ public class HotReloadIT {
         // 验证 afterExtensionDestroyed 被调用
         assertTrue(destroyedCount.get() >= 1, "afterExtensionDestroyed 应被调用");
 
-        // 验证旧 JAR 文件句柄已释放：Windows 上若 ClassLoader 未关闭则无法删除
+        // 验证旧 JAR 文件句柄已释放:Windows 上若 ClassLoader 未关闭则无法删除
         Path oldJarPath = pluginsDir.resolve("plugin-hello.jar");
         assertDoesNotThrow(() -> Files.delete(oldJarPath), "旧 JAR 文件句柄应在卸载后释放");
 
-        // 清理可能引用旧 Class 的追踪列表，避免妨碍 ClassLoader GC
+        // 清理可能引用旧 Class 的追踪列表,避免妨碍 ClassLoader GC
         destroyedClasses.clear();
 
-        // 最佳努力：先卸载新插件释放文件句柄，再尝试 GC 旧 ClassLoader
+        // 最佳努力:先卸载新插件释放文件句柄,再尝试 GC 旧 ClassLoader
         extBefore = null;
         oldLoader = null;
         manager.unloadPlugins();

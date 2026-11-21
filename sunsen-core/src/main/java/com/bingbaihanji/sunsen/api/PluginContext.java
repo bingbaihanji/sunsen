@@ -54,8 +54,8 @@ public interface PluginContext {
      * 按 ID 精确获取指定扩展点的单个扩展实例.
      *
      * @param extensionPoint 扩展点接口类型
-     * @param extensionId    扩展 ID（对应 {@code @Extension.id()} 的值）
-     * @return 扩展实例，未找到时返回 {@link Optional#empty()}
+     * @param extensionId    扩展 ID(对应 {@code @Extension.id()} 的值)
+     * @return 扩展实例,未找到时返回 {@link Optional#empty()}
      */
     default <T> Optional<T> getExtension(Class<T> extensionPoint, String extensionId) {
         // 委托给 PluginManager 的单次原子查询,避免两次独立调用的快照错配

@@ -28,7 +28,7 @@ import java.util.concurrent.*;
  * manager.startPlugins();
  *
  * // 启动文件监听(try-with-resources 或手动 close)
- * PluginWatcher watcher = new PluginWatcher(manager);
+ * PluginWatcher watcher = new PluginWatcher(manager, manager.getPluginsDir());
  * // ...
  * watcher.close();
  * }</pre>
@@ -81,7 +81,7 @@ public class PluginWatcher implements AutoCloseable {
                 StandardWatchEventKinds.ENTRY_MODIFY,
                 StandardWatchEventKinds.ENTRY_DELETE);
 
-        // 初始化 jarToPluginId 快照：扫描目录，将已加载的 JAR 路径与插件 ID 关联
+        // 初始化 jarToPluginId 快照:扫描目录,将已加载的 JAR 路径与插件 ID 关联
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(pluginsDir, "*.jar")) {
             for (Path jar : stream) {
                 try {
